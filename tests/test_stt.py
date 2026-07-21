@@ -40,6 +40,8 @@ def test_init_with_bad_model_raises_runtime_error(monkeypatch):
     settings = Settings(
         stt_model="invalid/model",
         tts_model="dummy",
+        tts_engine="kokoro",
+        piper_voice="en_US-lessac-high",
         default_voice="dummy",
         port=8790,
         device="cpu",

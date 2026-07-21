@@ -14,4 +14,15 @@ print("Downloading TTS model files...")
 hf_hub_download(s.tts_model, "model.onnx")
 hf_hub_download(s.tts_model, "voices.bin")
 
+# TTS (Piper): the voice files PiperTtsEngine loads at runtime
+print("Downloading Piper voice model...")
+hf_hub_download(
+    repo_id="rhasspy/piper-voices",
+    filename=f"en/{s.piper_voice}/{s.piper_voice}.onnx"
+)
+hf_hub_download(
+    repo_id="rhasspy/piper-voices",
+    filename=f"en/{s.piper_voice}/{s.piper_voice}.onnx.json"
+)
+
 print("models cached")
