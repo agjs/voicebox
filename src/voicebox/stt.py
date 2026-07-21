@@ -83,13 +83,15 @@ class SttEngine:
             ) from exc
 
     def transcribe(self, audio: bytes, language: str = "en") -> str:
+        # Validate language before decoding so an unsupported language fails fast
+        # without spending CPU on audio decode.
+        if language not in self.model.supported_languages:
+            raise AudioDecodeError(
+                f"language {language!r} is not supported by model; "
+                f"supported: {', '.join(self.model.supported_languages)}"
+            )
         try:
             decoded = _decode_audio_limited(audio, self.max_audio_seconds)
-            if language not in self.model.supported_languages:
-                raise AudioDecodeError(
-                    f"language {language!r} is not supported by model; "
-                    f"supported: {', '.join(self.model.supported_languages)}"
-                )
             segments, _info = self.model.transcribe(
                 decoded,
                 language=language,
