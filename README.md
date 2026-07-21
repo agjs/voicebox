@@ -1,0 +1,35 @@
+# voicebox
+
+A small, self-hosted, **OpenAI-compatible speech server** — speech-to-text
+(`faster-whisper`) and streaming text-to-speech (`Kokoro`) — for full voice
+interaction with local AI. It's a single, universal audio backend: any client
+that speaks the OpenAI audio API (browser chat UIs, custom agent harnesses,
+CLIs, coding agents) gets voice with no glue code.
+
+Vendor-neutral by design. Runs **CPU-only on modest hardware** (a mini PC or an
+old quad-core is enough) and scales up transparently on a host with an NVIDIA
+GPU.
+
+## Status
+
+Piece A of a 3-part effort. Design approved — see
+[`docs/superpowers/specs/2026-07-21-voicebox-speech-server-design.md`](docs/superpowers/specs/2026-07-21-voicebox-speech-server-design.md).
+Implementation not yet started.
+
+- **Piece A — voicebox (this repo):** the shared speech server.
+- **Piece B — voice chat client:** mic → STT → local LLM → streaming TTS → speakers.
+- **Piece C — coding-agent voice:** spoken replies + push-to-talk dictation.
+
+Pieces B and C are the first two of an open-ended set of consumers; browser UIs
+and custom harnesses plug into the same server directly.
+
+## Endpoints (planned)
+
+- `POST /v1/audio/transcriptions` — multipart audio → `{"text": ...}`
+- `POST /v1/audio/speech` — `{input, voice, ...}` → streamed audio
+- `GET /health`
+
+## Hardware
+
+CPU-first, GPU-optional. English-only models by default (swappable via config).
+See the spec for a reference CPU benchmark and rationale.
