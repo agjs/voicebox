@@ -1,8 +1,8 @@
 from __future__ import annotations
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 from voicebox.config import Settings, load_settings
-from voicebox.wav import wav_header
+from voicebox.wav import pcm_to_wav_bytes
 
 _SUPPORTED_FORMATS = {"wav", "pcm"}
 
@@ -48,13 +48,20 @@ def create_app(stt, tts, settings: Settings) -> FastAPI:
             raise HTTPException(status_code=400,
                                 detail=f"input exceeds {settings.max_input_chars} character limit")
 
+        if response_format == "wav":
+            # Buffer to a COMPLETE, correctly-sized WAV. Synthesis is fast, and a
+            # proper header (real RIFF/data sizes) is what strict decoders like
+            # Open WebUI's Web Audio path require — a streaming placeholder-size
+            # header decodes to distorted audio there.
+            pcm = b"".join(tts.synthesize_stream(text, voice))
+            return Response(content=pcm_to_wav_bytes(pcm, tts.sample_rate),
+                            media_type="audio/wav")
+
+        # pcm: raw int16 stream for low-latency clients that play as bytes arrive.
         def gen():
-            if response_format == "wav":
-                yield wav_header(tts.sample_rate)
             for chunk in tts.synthesize_stream(text, voice):
                 yield chunk
 
-        media = "audio/wav" if response_format == "wav" else "audio/pcm"
-        return StreamingResponse(gen(), media_type=media)
+        return StreamingResponse(gen(), media_type="audio/pcm")
 
     return app
