@@ -1,0 +1,17 @@
+services:
+  voicebox:
+    build: .
+    image: voicebox:latest
+    ports:
+      - "8790:8790"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "6"
+          memory: 4g
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8790/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
