@@ -1,0 +1,30 @@
+import pytest
+from voicebox.config import load_settings
+from voicebox.tts import TtsEngine, split_sentences
+
+
+def test_split_sentences():
+    out = split_sentences("Hello there. How are you? Fine!  ")
+    assert out == ["Hello there.", "How are you?", "Fine!"]
+
+
+def test_split_single_sentence_no_terminator():
+    assert split_sentences("just one clause") == ["just one clause"]
+
+
+@pytest.fixture(scope="module")
+def engine():
+    return TtsEngine(load_settings())
+
+
+def test_streams_one_chunk_per_sentence(engine):
+    chunks = list(engine.synthesize_stream("Hello there. How are you?"))
+    assert len(chunks) == 2
+    assert all(isinstance(c, bytes) and len(c) > 0 for c in chunks)
+    # int16 PCM => even byte length
+    assert all(len(c) % 2 == 0 for c in chunks)
+
+
+def test_empty_text_raises(engine):
+    with pytest.raises(ValueError):
+        list(engine.synthesize_stream("   "))
