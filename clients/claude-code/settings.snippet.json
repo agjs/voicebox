@@ -1,0 +1,7 @@
+{
+  "hooks": {
+    "Stop": {
+      "command": "${HOME}/.local/bin/voicebox-speak.sh"
+    }
+  }
+}
