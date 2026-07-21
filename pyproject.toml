@@ -1,0 +1,24 @@
+[project]
+name = "voicebox"
+version = "0.1.0"
+description = "Self-hosted OpenAI-compatible speech server (STT + streaming TTS)"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "python-multipart>=0.0.9",
+  "faster-whisper>=1.0.3",
+  "kokoro-onnx>=0.4.0",
+  "soundfile>=0.12",
+  "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
