@@ -12,6 +12,8 @@ class Settings:
     device: str
     cpu_threads: int
     max_audio_seconds: int
+    max_upload_mb: int
+    max_input_chars: int
 
 
 def load_settings() -> Settings:
@@ -23,4 +25,6 @@ def load_settings() -> Settings:
         device=os.getenv("VOICEBOX_DEVICE", "cpu"),
         cpu_threads=int(os.getenv("VOICEBOX_CPU_THREADS", "0")),
         max_audio_seconds=int(os.getenv("VOICEBOX_MAX_AUDIO_SECONDS", "120")),
+        max_upload_mb=int(os.getenv("VOICEBOX_MAX_UPLOAD_MB", "25")),
+        max_input_chars=int(os.getenv("VOICEBOX_MAX_INPUT_CHARS", "4000")),
     )

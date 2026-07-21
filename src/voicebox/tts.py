@@ -19,10 +19,17 @@ class TtsEngine:
 
     def __init__(self, settings: Settings) -> None:
         self.default_voice = settings.default_voice
-        # Download model and voices files from HuggingFace
-        onnx_path = hf_hub_download(settings.tts_model, "model.onnx")
-        voices_path = hf_hub_download(settings.tts_model, "voices.bin")
-        self.kokoro = Kokoro(onnx_path, voices_path)
+        try:
+            # Download model and voices files from HuggingFace
+            onnx_path = hf_hub_download(settings.tts_model, "model.onnx")
+            voices_path = hf_hub_download(settings.tts_model, "voices.bin")
+            self.kokoro = Kokoro(onnx_path, voices_path)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to load TTS model '{settings.tts_model}'. "
+                f"If offline, ensure models are baked into the image / present in the HF cache. "
+                f"Original error: {exc}"
+            ) from exc
 
     def synthesize_stream(self, text: str, voice: str | None = None) -> Iterator[bytes]:
         sentences = split_sentences(text)

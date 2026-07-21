@@ -27,3 +27,29 @@ def test_rejects_too_long_audio(engine, monkeypatch):
     with open("tests/fixtures/hello.wav", "rb") as f:
         with pytest.raises(AudioTooLongError):
             engine.transcribe(f.read())
+
+
+def test_init_with_bad_model_raises_runtime_error(monkeypatch):
+    from voicebox.stt import SttEngine
+    from voicebox.config import Settings
+
+    def mock_whisper_model(*args, **kwargs):
+        raise ValueError("model not found")
+
+    monkeypatch.setattr("voicebox.stt.WhisperModel", mock_whisper_model)
+    settings = Settings(
+        stt_model="invalid/model",
+        tts_model="dummy",
+        default_voice="dummy",
+        port=8790,
+        device="cpu",
+        cpu_threads=0,
+        max_audio_seconds=120,
+        max_upload_mb=25,
+        max_input_chars=4000,
+    )
+
+    with pytest.raises(RuntimeError) as exc_info:
+        SttEngine(settings)
+    assert "Failed to load STT model" in str(exc_info.value)
+    assert "invalid/model" in str(exc_info.value)

@@ -21,7 +21,11 @@ def create_app(stt, tts, settings: Settings) -> FastAPI:
         language: str = Form(default="en"),
         response_format: str = Form(default="json"),
     ):
-        audio = await file.read()
+        max_bytes = settings.max_upload_mb * 1024 * 1024
+        audio = await file.read(max_bytes + 1)
+        if len(audio) > max_bytes:
+            raise HTTPException(status_code=413,
+                                detail=f"file exceeds {settings.max_upload_mb} MB limit")
         try:
             text = stt.transcribe(audio)
         except ValueError as exc:  # AudioDecodeError / AudioTooLongError
@@ -34,11 +38,15 @@ def create_app(stt, tts, settings: Settings) -> FastAPI:
         text = (body.get("input") or "")
         response_format = (body.get("response_format") or "wav").lower()
         voice = body.get("voice")
+        _model = body.get("model")
         if response_format not in _SUPPORTED_FORMATS:
             raise HTTPException(status_code=400,
                                 detail=f"unsupported response_format: {response_format}")
         if not text.strip():
             raise HTTPException(status_code=400, detail="input is empty")
+        if len(text) > settings.max_input_chars:
+            raise HTTPException(status_code=400,
+                                detail=f"input exceeds {settings.max_input_chars} character limit")
 
         def gen():
             if response_format == "wav":
