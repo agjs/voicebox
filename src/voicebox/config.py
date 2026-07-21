@@ -23,7 +23,7 @@ def load_settings() -> Settings:
         stt_model=os.getenv("VOICEBOX_STT_MODEL", "Systran/faster-distil-whisper-small.en"),
         tts_model=os.getenv("VOICEBOX_TTS_MODEL", "speaches-ai/Kokoro-82M-v1.0-ONNX"),
         tts_engine=os.getenv("VOICEBOX_TTS_ENGINE", "kokoro"),
-        piper_voice=os.getenv("VOICEBOX_PIPER_VOICE", "en_US-lessac-high"),
+        piper_voice=os.getenv("VOICEBOX_PIPER_VOICE", "en_US-amy-medium"),
         default_voice=os.getenv("VOICEBOX_DEFAULT_VOICE", "af_heart"),
         port=int(os.getenv("VOICEBOX_PORT", "8790")),
         device=os.getenv("VOICEBOX_DEVICE", "cpu"),
