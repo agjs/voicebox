@@ -9,6 +9,7 @@ class Settings:
     tts_model: str
     tts_engine: str
     piper_voice: str
+    piper_length_scale: float
     default_voice: str
     port: int
     device: str
@@ -24,6 +25,8 @@ def load_settings() -> Settings:
         tts_model=os.getenv("VOICEBOX_TTS_MODEL", "speaches-ai/Kokoro-82M-v1.0-ONNX"),
         tts_engine=os.getenv("VOICEBOX_TTS_ENGINE", "kokoro"),
         piper_voice=os.getenv("VOICEBOX_PIPER_VOICE", "en_US-amy-medium"),
+        # Piper speaking rate: <1.0 = faster speech, >1.0 = slower. 1.0 = voice default.
+        piper_length_scale=float(os.getenv("VOICEBOX_PIPER_LENGTH_SCALE", "1.0")),
         default_voice=os.getenv("VOICEBOX_DEFAULT_VOICE", "af_heart"),
         port=int(os.getenv("VOICEBOX_PORT", "8790")),
         device=os.getenv("VOICEBOX_DEVICE", "cpu"),

@@ -27,12 +27,14 @@ class PiperTtsEngine:
         self.piper_voice_name = settings.piper_voice
         onnx_rel, json_rel = piper_voice_relpaths(settings.piper_voice)
         try:
-            from piper import PiperVoice
+            from piper import PiperVoice, SynthesisConfig
 
             # Resolve baked voice files from the HF cache (respects HF_HUB_OFFLINE=1).
             voice_onnx = hf_hub_download(repo_id=_PIPER_REPO, filename=onnx_rel)
             voice_json = hf_hub_download(repo_id=_PIPER_REPO, filename=json_rel)
             self.piper_voice = PiperVoice.load(voice_onnx, config_path=voice_json)
+            # Speaking rate: length_scale < 1.0 speaks faster.
+            self._syn_config = SynthesisConfig(length_scale=settings.piper_length_scale)
             with open(voice_json) as f:
                 cfg = json.load(f)
             self.sample_rate = int(cfg.get("audio", {}).get("sample_rate", 22050))
@@ -54,6 +56,6 @@ class PiperTtsEngine:
         # One int16-LE mono PCM chunk per sentence (playback can start on sentence 1).
         for sentence in sentences:
             pcm = bytearray()
-            for chunk in self.piper_voice.synthesize(sentence):
+            for chunk in self.piper_voice.synthesize(sentence, syn_config=self._syn_config):
                 pcm += chunk.audio_int16_bytes
             yield bytes(pcm)
