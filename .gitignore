@@ -27,3 +27,6 @@ hf-cache/
 
 # OS
 .DS_Store
+
+# SDD process scratch (briefs, reports, review packages, ledger)
+.superpowers/
