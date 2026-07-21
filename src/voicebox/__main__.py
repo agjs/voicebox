@@ -9,11 +9,12 @@ from voicebox.app import create_app
 
 def main() -> None:
     settings = load_settings()
-    # Select TTS engine based on configuration
     if settings.tts_engine == "piper":
         tts = PiperTtsEngine(settings)
-    else:
+    elif settings.tts_engine == "kokoro":
         tts = TtsEngine(settings)
+    else:  # load_settings validates this; retain a defensive guard.
+        raise ValueError(f"unsupported TTS engine: {settings.tts_engine}")
     application = create_app(SttEngine(settings), tts, settings)
     uvicorn.run(application, host="0.0.0.0", port=settings.port)
 

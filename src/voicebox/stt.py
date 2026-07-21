@@ -1,6 +1,9 @@
 from __future__ import annotations
 import io
-import wave
+import gc
+
+import av
+import numpy as np
 from faster_whisper import WhisperModel
 from voicebox.config import Settings
 
@@ -13,30 +16,56 @@ class AudioTooLongError(ValueError):
     pass
 
 
-def _duration_seconds(audio: bytes) -> float | None:
-    """Best-effort duration for WAV; returns None for other containers or streaming WAVs.
+def _decode_audio_limited(audio: bytes, max_seconds: int, sampling_rate: int = 16000) -> np.ndarray:
+    """Decode any PyAV-supported container while enforcing a decoded-duration cap."""
+    max_samples = max_seconds * sampling_rate
+    chunks: list[np.ndarray] = []
+    sample_count = 0
+    resampler = av.audio.resampler.AudioResampler(format="s16", layout="mono", rate=sampling_rate)
 
-    Streaming WAVs have placeholder sizes (0xFFFFFFFF) in the RIFF/data chunks,
-    which cause Python's wave module to miscompute duration. Detect and skip them.
-    """
+    def append_frame(frame) -> None:
+        nonlocal sample_count
+        chunk = frame.to_ndarray().reshape(-1)
+        sample_count += len(chunk)
+        if sample_count > max_samples:
+            raise AudioTooLongError(f"audio exceeds cap {max_seconds}s after decoding")
+        chunks.append(chunk)
+
     try:
-        # Check for streaming WAV with placeholder sizes (0xFFFFFFFF)
-        if len(audio) >= 44:
-            # RIFF size at bytes 4-7, data size at bytes 40-43
-            riff_size = int.from_bytes(audio[4:8], "little")
-            data_size = int.from_bytes(audio[40:44], "little")
-            if riff_size == 0xFFFFFFFF or data_size == 0xFFFFFFFF:
-                # Streaming WAV with placeholders; can't determine duration
-                return None
-        with wave.open(io.BytesIO(audio), "rb") as w:
-            return w.getnframes() / float(w.getframerate())
-    except Exception:
-        return None
+        with av.open(io.BytesIO(audio), mode="r", metadata_errors="ignore") as container:
+            frames = iter(container.decode(audio=0))
+            while True:
+                try:
+                    frame = next(frames)
+                except StopIteration:
+                    break
+                except av.error.InvalidDataError:
+                    continue
+                for resampled in resampler.resample(frame):
+                    append_frame(resampled)
+            for resampled in resampler.resample(None):
+                append_frame(resampled)
+    except AudioTooLongError:
+        raise
+    except Exception as exc:
+        raise AudioDecodeError(str(exc)) from exc
+    finally:
+        del resampler
+        gc.collect()
+
+    if not chunks:
+        raise AudioDecodeError("no audio decoded")
+    pcm16 = np.concatenate(chunks)
+    return pcm16.astype(np.float32) / 32768.0
 
 
 class SttEngine:
     def __init__(self, settings: Settings) -> None:
         self.max_audio_seconds = settings.max_audio_seconds
+        self.beam_size = settings.stt_beam_size
+        self.vad_filter = settings.stt_vad_filter
+        self.vad_parameters = {"min_silence_duration_ms": settings.stt_min_silence_ms}
+        self.hotwords = settings.stt_hotwords
         compute_type = "int8" if settings.device == "cpu" else "float16"
         try:
             self.model = WhisperModel(
@@ -44,6 +73,7 @@ class SttEngine:
                 device=settings.device,
                 compute_type=compute_type,
                 cpu_threads=settings.cpu_threads,
+                revision=settings.stt_model_revision,
             )
         except Exception as exc:
             raise RuntimeError(
@@ -52,17 +82,28 @@ class SttEngine:
                 f"Original error: {exc}"
             ) from exc
 
-    def transcribe(self, audio: bytes) -> str:
-        dur = _duration_seconds(audio)
-        if dur is not None and dur > self.max_audio_seconds:
-            raise AudioTooLongError(f"audio {dur:.1f}s exceeds cap {self.max_audio_seconds}s")
+    def transcribe(self, audio: bytes, language: str = "en") -> str:
         try:
-            segments, _info = self.model.transcribe(io.BytesIO(audio), language="en")
+            decoded = _decode_audio_limited(audio, self.max_audio_seconds)
+            if language not in self.model.supported_languages:
+                raise AudioDecodeError(
+                    f"language {language!r} is not supported by model; "
+                    f"supported: {', '.join(self.model.supported_languages)}"
+                )
+            segments, _info = self.model.transcribe(
+                decoded,
+                language=language,
+                beam_size=self.beam_size,
+                condition_on_previous_text=False,
+                without_timestamps=True,
+                vad_filter=self.vad_filter,
+                vad_parameters=self.vad_parameters if self.vad_filter else None,
+                hotwords=self.hotwords,
+            )
             parts = [seg.text for seg in segments]
+        except (AudioDecodeError, AudioTooLongError):
+            raise
         except Exception as exc:  # PyAV/CT2 decode failures
             raise AudioDecodeError(str(exc)) from exc
         text = "".join(parts).strip()
-        if not text and dur is None:
-            # Non-WAV that produced nothing usable is treated as undecodable.
-            raise AudioDecodeError("no audio decoded")
         return text

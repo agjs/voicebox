@@ -7,17 +7,19 @@ WebUI, your own agents, CLIs, coding assistants) gets a local voice with no glue
 code.
 
 - Talk to your local models. One backend, many clients.
-- Fully local and private. No cloud, no API keys, nothing leaves your box.
+- Fully local and private. No cloud or required API keys; nothing leaves your box.
 - Fast on plain CPUs. Runs real-time on a mini PC or an old quad-core, no GPU required (it uses one if you have it).
 - Drop-in OpenAI audio API: `/v1/audio/transcriptions` and `/v1/audio/speech`.
 - Swappable voices and engines via env vars, no rebuild.
 
 ## Quick start
 
-You only need Docker. The models are baked into the image.
+You only need Docker. The models are baked into the image. Compose binds to
+localhost by default; set a private bind address when clients are on another machine.
 
 ```bash
 git clone https://github.com/agjs/voicebox.git && cd voicebox
+cp .env.example .env
 docker compose up -d --build      # first build downloads the models (a few minutes)
 
 curl -fsS localhost:8790/health   # {"status":"ok","models_loaded":true}
@@ -42,6 +44,11 @@ curl -fsS localhost:8790/v1/audio/transcriptions \
 
 Point any OpenAI-audio-compatible client at `http://<host>:8790/v1` and you are done.
 
+For LAN access, set `VOICEBOX_BIND_ADDRESS` to the Lenovo's private IP (or
+`0.0.0.0` when a firewall controls access). Set `VOICEBOX_API_KEY` as well; clients
+can send it as an OpenAI-style bearer token. The health endpoint intentionally
+remains unauthenticated for container probes.
+
 > No Docker? `pip install -e ".[dev]" && python -m voicebox` also works. It needs
 > `ffmpeg` and `espeak-ng` on the host.
 
@@ -55,16 +62,17 @@ In Admin, open Settings then Audio:
 |---|---|
 | Speech-to-Text Engine | `OpenAI` |
 | STT API Base URL | `http://<host>:8790/v1` |
-| STT API Key | `sk-none` (any non-empty string; voicebox has no auth) |
+| STT API Key | `sk-none`, or your `VOICEBOX_API_KEY` when authentication is enabled |
 | Text-to-Speech Engine | `OpenAI` |
 | TTS API Base URL | `http://<host>:8790/v1` |
 | TTS Voice | `af_heart` (ignored by Piper, used by Kokoro) |
 
 ### Included clients (`clients/`)
 
-`clients/voice-chat/` is a turn-taking CLI: mic, then STT, then your LLM, then
-streaming TTS, then speakers. `clients/claude-code/` has a Stop-hook that reads
-Claude Code's replies aloud, plus a push-to-talk dictation helper. Both read
+`clients/voice-chat/` is a turn-taking CLI with 30 ms VAD, streamed LLM output,
+background Piper synthesis, and gapless queued playback. `clients/claude-code/`
+has a Stop hook that synthesizes the first sentence before the remainder, plus a
+push-to-talk dictation helper. Both read
 `VOICEBOX_URL` (voice-chat also takes your LLM endpoint).
 
 ## Voices
@@ -79,9 +87,9 @@ ship baked into the image and switch with no rebuild:
 | `en_US-lessac-medium` | clear, neutral |
 
 Audition every Piper voice at https://rhasspy.github.io/piper-samples/ . Found
-one you like? Set `VOICEBOX_PIPER_VOICE=en_US-<voice>-<quality>`. Voices that are
-not baked in are fetched on first use (needs network), or add them to
-`scripts/fetch_models.py` and rebuild to keep the image offline.
+one you like? Set `VOICEBOX_PIPER_VOICE=en_US-<voice>-<quality>`, add it to
+`scripts/fetch_models.py`, and rebuild. Runtime Hugging Face access is deliberately
+offline, so voices must be baked into the image.
 
 Speaking rate is `VOICEBOX_PIPER_LENGTH_SCALE`, where lower is faster (`1.0` is
 natural, `0.8` is brisk, `1.2` and up is slow narration).
@@ -98,8 +106,8 @@ them, such as `af_bella` and `bf_emma`) but is slower on CPU. Switch to it with
 
 | Endpoint | Description |
 |---|---|
-| `POST /v1/audio/transcriptions` | Multipart `file` (any common audio format) returns `{"text": "..."}`. |
-| `POST /v1/audio/speech` | JSON `{input, voice?, response_format?}` returns audio. `wav` (default, complete file) or `pcm` (raw 16-bit mono, streamed). |
+| `POST /v1/audio/transcriptions` | Multipart `file` (any common audio format), `language`, and `response_format=json\|text`. |
+| `POST /v1/audio/speech` | JSON `{input, voice?, response_format?}`. `wav` is complete; `pcm` is streamed 16-bit mono and declares its format in `X-Audio-*` headers. |
 | `GET /health` | Returns `{"status":"ok","models_loaded":true}`. |
 
 The shapes match OpenAI's audio API, so existing SDKs and clients work unmodified.
@@ -116,9 +124,17 @@ Everything is set with environment variables (see `.env.example`):
 | `VOICEBOX_PIPER_NOISE_SCALE` | `0.667` | Prosody variability |
 | `VOICEBOX_PIPER_NOISE_W` | `0.8` | Phoneme-duration variability |
 | `VOICEBOX_STT_MODEL` | `Systran/faster-distil-whisper-small.en` | faster-whisper model |
+| `VOICEBOX_STT_MODEL_REVISION` | pinned commit | Reproducible Hugging Face model revision |
+| `VOICEBOX_STT_BEAM_SIZE` | `1` | Greedy decoding for interactive latency; use `5` for more accuracy |
+| `VOICEBOX_STT_VAD_FILTER` | `true` | Remove non-speech with faster-whisper's Silero VAD |
+| `VOICEBOX_STT_MIN_SILENCE_MS` | `500` | Silence removed by server-side VAD |
+| `VOICEBOX_STT_HOTWORDS` | empty | Comma-separated project names and vocabulary hints |
 | `VOICEBOX_TTS_MODEL` | `speaches-ai/Kokoro-82M-v1.0-ONNX` | Kokoro model (when engine is kokoro) |
 | `VOICEBOX_DEFAULT_VOICE` | `af_heart` | Kokoro default voice |
 | `VOICEBOX_DEVICE` | `cpu` | `cpu` or `cuda` |
+| `VOICEBOX_CPU_THREADS` | `4` | CTranslate2 CPU threads; matches the i7-6700T's physical cores |
+| `VOICEBOX_API_KEY` | empty | Optional bearer token protecting audio endpoints |
+| `VOICEBOX_BIND_ADDRESS` | `127.0.0.1` | Host interface published by Docker Compose |
 | `VOICEBOX_PORT` | `8790` | Listen port |
 | `VOICEBOX_MAX_AUDIO_SECONDS` | `120` | Reject longer STT input |
 | `VOICEBOX_MAX_UPLOAD_MB` | `25` | Reject larger uploads |
@@ -134,13 +150,20 @@ CPU-only, on one reference box (a 2015-era quad-core, no GPU):
 | TTS | Piper `amy-medium` | about 0.07x (roughly 14x faster than real-time) |
 | TTS | Kokoro-82M | about 0.5x |
 
-A newer CPU or an NVIDIA GPU (`VOICEBOX_DEVICE=cuda`) is faster still.
+For the i7-6700T, keep Piper, int8 STT, four inference threads, and a four-CPU
+container quota. If latency varies under load, give voicebox priority over
+Prometheus/ClickHouse/Loki work and watch for sustained frequency drops. A future
+CUDA node can use `VOICEBOX_DEVICE=cuda`; the CPU-oriented Piper path remains the
+default. The supplied image is CPU-only: a future GPU deployment also needs a
+CUDA/cuDNN runtime image (or a host installation with those libraries), not only
+the environment-variable change.
 
 ## Development
 
 ```bash
 pip install -e ".[dev]"
-pytest                    # unit + latency tests
+pytest -m "not model and not latency"  # fast unit suite, including clients
+pytest                    # full local model + latency suite
 docker compose up -d --build && ./scripts/smoke.sh   # end-to-end
 ```
 

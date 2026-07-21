@@ -2,8 +2,7 @@
 Unit tests for voice chat pipeline (pure logic, no network/audio).
 """
 
-import pytest
-from pipeline import parse_sse_stream, strip_reasoning, SentenceChunker
+from pipeline import ReasoningFilter, SentenceChunker, parse_sse_stream, strip_reasoning
 
 
 class TestParseSseStream:
@@ -29,7 +28,7 @@ class TestParseSseStream:
         """Stop parsing on [DONE] marker."""
         chunks = [
             b'data: {"choices":[{"delta":{"content":"Done"}}]}\n',
-            b'data: [DONE]\n',
+            b"data: [DONE]\n",
             b'data: {"choices":[{"delta":{"content":"ignored"}}]}\n',
         ]
         result = list(parse_sse_stream(iter(chunks)))
@@ -39,7 +38,7 @@ class TestParseSseStream:
         """Ignore keep-alive comment lines (`:`)."""
         chunks = [
             b'data: {"choices":[{"delta":{"content":"Hello"}}]}\n',
-            b': keep-alive\n',
+            b": keep-alive\n",
             b'data: {"choices":[{"delta":{"content":"world"}}]}\n',
         ]
         result = list(parse_sse_stream(iter(chunks)))
@@ -49,7 +48,7 @@ class TestParseSseStream:
         """Skip empty lines."""
         chunks = [
             b'data: {"choices":[{"delta":{"content":"Test"}}]}\n',
-            b'\n',
+            b"\n",
             b'data: {"choices":[{"delta":{"content":"works"}}]}\n',
         ]
         result = list(parse_sse_stream(iter(chunks)))
@@ -67,7 +66,7 @@ class TestParseSseStream:
     def test_handles_malformed_json(self):
         """Skip malformed JSON lines."""
         chunks = [
-            b'data: {bad json\n',
+            b"data: {bad json\n",
             b'data: {"choices":[{"delta":{"content":"valid"}}]}\n',
         ]
         result = list(parse_sse_stream(iter(chunks)))
@@ -98,10 +97,10 @@ class TestStripReasoning:
         assert result == "Start  end"
 
     def test_removes_stray_opening_tags(self):
-        """Remove stray <think> opening tags."""
+        """Suppress content after an unmatched opening tag to avoid reasoning leaks."""
         text = "Before <think> stray tag"
         result = strip_reasoning(text)
-        assert result == "Before  stray tag"
+        assert result == "Before "
 
     def test_removes_stray_closing_tags(self):
         """Remove stray </think> closing tags."""
@@ -121,6 +120,12 @@ class TestStripReasoning:
         result = strip_reasoning(text)
         assert "<other>keep</other>" in result
         assert "<think>" not in result
+
+    def test_streaming_filter_handles_tags_split_across_tokens(self):
+        filter_ = ReasoningFilter()
+        tokens = ["Visible ", "<thi", "nk>", "secret reasoning", "</th", "ink>", "answer"]
+        result = "".join(filter_.feed(token) for token in tokens) + filter_.flush()
+        assert result == "Visible answer"
 
 
 class TestSentenceChunker:

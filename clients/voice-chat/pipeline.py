@@ -91,13 +91,74 @@ def strip_reasoning(text: str) -> str:
     Returns:
         Text with reasoning blocks removed
     """
-    # Remove full <think>...</think> blocks (DOTALL = . matches newlines)
-    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    filter_ = ReasoningFilter()
+    return filter_.feed(text) + filter_.flush()
 
-    # Remove any stray opening or closing tags
-    text = re.sub(r"</?think>", "", text)
 
-    return text
+class ReasoningFilter:
+    """Remove ``<think>`` blocks safely when tags span streamed tokens."""
+
+    _OPEN = "<think>"
+    _CLOSE = "</think>"
+
+    def __init__(self) -> None:
+        self._buffer = ""
+        self._inside_reasoning = False
+
+    @staticmethod
+    def _partial_tag_length(text: str, tags: tuple[str, ...]) -> int:
+        longest = 0
+        for tag in tags:
+            max_length = min(len(text), len(tag) - 1)
+            for length in range(1, max_length + 1):
+                if text.endswith(tag[:length]):
+                    longest = max(longest, length)
+        return longest
+
+    def feed(self, text: str) -> str:
+        self._buffer += text
+        output: list[str] = []
+
+        while self._buffer:
+            if self._inside_reasoning:
+                close_at = self._buffer.find(self._CLOSE)
+                if close_at >= 0:
+                    self._buffer = self._buffer[close_at + len(self._CLOSE) :]
+                    self._inside_reasoning = False
+                    continue
+                keep = self._partial_tag_length(self._buffer, (self._CLOSE,))
+                self._buffer = self._buffer[-keep:] if keep else ""
+                break
+
+            open_at = self._buffer.find(self._OPEN)
+            stray_close_at = self._buffer.find(self._CLOSE)
+            positions = [pos for pos in (open_at, stray_close_at) if pos >= 0]
+            if positions:
+                tag_at = min(positions)
+                output.append(self._buffer[:tag_at])
+                if tag_at == open_at:
+                    self._inside_reasoning = True
+                    self._buffer = self._buffer[tag_at + len(self._OPEN) :]
+                else:
+                    self._buffer = self._buffer[tag_at + len(self._CLOSE) :]
+                continue
+
+            keep = self._partial_tag_length(self._buffer, (self._OPEN, self._CLOSE))
+            if keep:
+                output.append(self._buffer[:-keep])
+                self._buffer = self._buffer[-keep:]
+            else:
+                output.append(self._buffer)
+                self._buffer = ""
+            break
+
+        return "".join(output)
+
+    def flush(self) -> str:
+        remaining = "" if self._inside_reasoning else self._buffer
+        self._buffer = ""
+        self._inside_reasoning = False
+        return remaining
 
 
 class SentenceChunker:
@@ -180,7 +241,6 @@ class SentenceChunker:
                 return True
 
             # Skip spaces
-            space_pos = next_pos
             while next_pos < len(self._buffer) and self._buffer[next_pos] == " ":
                 next_pos += 1
 
@@ -222,7 +282,7 @@ class SentenceChunker:
             if newline_idx != -1 and (sentence_idx == -1 or newline_idx < sentence_idx):
                 # Newline comes first
                 sentence = self._buffer[:newline_idx].strip()
-                self._buffer = self._buffer[newline_idx + 1:]
+                self._buffer = self._buffer[newline_idx + 1 :]
                 if len(sentence) >= self._min_length:
                     yield sentence
             elif sentence_idx != -1:
@@ -230,7 +290,7 @@ class SentenceChunker:
                 # Strip leading/trailing, and collapse extra spaces before punctuation
                 sentence_raw = self._buffer[:sentence_idx].strip()
                 # Also clean up extra spaces before punctuation (e.g., "Hello  ." -> "Hello.")
-                sentence = re.sub(r'\s+([.!?]+)$', r'\1', sentence_raw)
+                sentence = re.sub(r"\s+([.!?]+)$", r"\1", sentence_raw)
                 self._buffer = self._buffer[sentence_idx:].lstrip()
                 if len(sentence) >= self._min_length:
                     yield sentence
@@ -239,7 +299,7 @@ class SentenceChunker:
                 # Only emit ! or ? at end-of-buffer (period could be followed by more text)
                 if self._buffer and self._buffer[-1] in "!?":
                     sentence = self._buffer.strip()
-                    sentence = re.sub(r'\s+([.!?]+)$', r'\1', sentence)
+                    sentence = re.sub(r"\s+([.!?]+)$", r"\1", sentence)
                     if len(sentence) >= self._min_length:
                         yield sentence
                         self._buffer = ""
@@ -254,6 +314,6 @@ class SentenceChunker:
         """
         remaining = self._buffer.strip()
         # Clean up extra spaces before punctuation
-        remaining = re.sub(r'\s+([.!?]+)$', r'\1', remaining)
+        remaining = re.sub(r"\s+([.!?]+)$", r"\1", remaining)
         self._buffer = ""
         return remaining if len(remaining) >= self._min_length else ""

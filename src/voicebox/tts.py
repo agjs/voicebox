@@ -6,12 +6,14 @@ from huggingface_hub import hf_hub_download
 from kokoro_onnx import Kokoro
 from voicebox.config import Settings
 
-_SENTENCE_RE = re.compile(r"[^.!?]+[.!?]?")
+_SENTENCE_BOUNDARY_RE = re.compile(r'(?<=[.!?])\s+(?=[A-Z0-9"“‘])')
 
 
 def split_sentences(text: str) -> list[str]:
-    parts = [m.group().strip() for m in _SENTENCE_RE.finditer(text)]
-    return [p for p in parts if p]
+    parts: list[str] = []
+    for paragraph in re.split(r"\n+", text):
+        parts.extend(_SENTENCE_BOUNDARY_RE.split(paragraph.strip()))
+    return [part.strip() for part in parts if part.strip()]
 
 
 class TtsEngine:
@@ -21,8 +23,12 @@ class TtsEngine:
         self.default_voice = settings.default_voice
         try:
             # Download model and voices files from HuggingFace
-            onnx_path = hf_hub_download(settings.tts_model, "model.onnx")
-            voices_path = hf_hub_download(settings.tts_model, "voices.bin")
+            onnx_path = hf_hub_download(
+                settings.tts_model, "model.onnx", revision=settings.tts_model_revision
+            )
+            voices_path = hf_hub_download(
+                settings.tts_model, "voices.bin", revision=settings.tts_model_revision
+            )
             self.kokoro = Kokoro(onnx_path, voices_path)
         except Exception as exc:
             raise RuntimeError(

@@ -4,7 +4,7 @@ Speak Claude Code's replies via local TTS and dictate locally via local STT, usi
 
 ## What You Get
 
-- **Spoken replies**: Enable a Stop-hook that speaks a cleaned summary of Claude Code's assistant messages
+- **Spoken replies**: A Stop hook speaks the first sentence quickly, synthesizing the remainder during playback
 - **Local dictation**: Record from your microphone or transcribe existing audio files without cloud services
 
 ## Requirements
@@ -15,7 +15,7 @@ Speak Claude Code's replies via local TTS and dictate locally via local STT, usi
 
 For local dictation only:
 - Python 3.11+
-- `sounddevice` and `scipy` (if using microphone recording)
+- `sounddevice` and `numpy` (if using microphone recording)
 
 ## Installation
 
@@ -57,7 +57,7 @@ export VOICEBOX_URL=http://<host>:8790
 ```
 
 You can also customize:
-- `VOICEBOX_VOICE` (default: `af_heart`): voice identifier
+- `VOICEBOX_VOICE` (default: `en_US-amy-medium`): voice identifier
 - `VOICEBOX_SPEAK_MAX_CHARS` (default: `600`): character limit for spoken text
 - `VOICEBOX_LOG` (default: `/dev/null`): optional log file for debugging
 
@@ -73,7 +73,7 @@ For fully local transcription via voicebox:
 
 ```bash
 # Install dependencies (if using microphone)
-pip install sounddevice scipy
+pip install sounddevice numpy
 
 # Record and transcribe from microphone
 ~/.local/bin/voicebox-dictate
@@ -93,15 +93,16 @@ All scripts use environment variables for configuration:
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `VOICEBOX_URL` | `http://localhost:8790` | voicebox endpoint |
-| `VOICEBOX_VOICE` | `af_heart` | TTS voice identifier |
+| `VOICEBOX_VOICE` | `en_US-amy-medium` | TTS voice identifier |
 | `VOICEBOX_SPEAK_MAX_CHARS` | `600` | Max characters to speak per reply |
 | `VOICEBOX_LOG` | `/dev/null` | Optional debug log for the speak hook |
+| `VOICEBOX_API_KEY` | empty | Optional bearer token shared with the server |
 
 Example:
 
 ```bash
 export VOICEBOX_URL=http://<host>:8790
-export VOICEBOX_VOICE=en_male
+export VOICEBOX_VOICE=en_US-lessac-medium
 ```
 
 ## Troubleshooting
@@ -112,7 +113,7 @@ export VOICEBOX_VOICE=en_male
 - Check `VOICEBOX_LOG` if set: `tail -f /path/to/logfile`
 
 **Dictation errors**
-- Ensure sounddevice and scipy are installed: `pip install sounddevice scipy`
+- Ensure sounddevice and numpy are installed: `pip install sounddevice numpy`
 - Test the transcription endpoint: `curl -X POST http://localhost:8790/v1/audio/transcriptions -F file=@yourfile.wav`
 
 **Clipboard not working**

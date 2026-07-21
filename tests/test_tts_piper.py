@@ -1,6 +1,8 @@
 import pytest
 from voicebox.tts import split_sentences
 
+pytestmark = pytest.mark.model
+
 
 # Test split_sentences is reused from voicebox.tts
 def test_piper_reuses_split_sentences():
