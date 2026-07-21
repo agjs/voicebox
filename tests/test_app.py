@@ -6,7 +6,11 @@ from voicebox.stt import AudioDecodeError
 
 
 class FakeStt:
-    def transcribe(self, audio: bytes) -> str:
+    def __init__(self):
+        self.last_language = None
+
+    def transcribe(self, audio: bytes, language: str = "en") -> str:
+        self.last_language = language
         if audio == b"bad":
             raise AudioDecodeError("bad")
         return "hello world"
@@ -34,27 +38,54 @@ def test_health(client):
 
 
 def test_transcription_ok(client):
-    r = client.post("/v1/audio/transcriptions",
-                    files={"file": ("a.wav", b"anything", "audio/wav")},
-                    data={"model": "whatever"})
+    r = client.post(
+        "/v1/audio/transcriptions",
+        files={"file": ("a.wav", b"anything", "audio/wav")},
+        data={"model": "whatever"},
+    )
     assert r.status_code == 200
     assert r.json() == {"text": "hello world"}
+    assert r.headers["server-timing"].startswith("stt;dur=")
+
+
+def test_transcription_text_format_honors_language():
+    stt = FakeStt()
+    client = TestClient(create_app(stt, FakeTts(), load_settings()))
+    r = client.post(
+        "/v1/audio/transcriptions",
+        files={"file": ("a.wav", b"anything", "audio/wav")},
+        data={"language": "fr", "response_format": "text"},
+    )
+    assert r.status_code == 200
+    assert r.text == "hello world"
+    assert stt.last_language == "fr"
 
 
 def test_transcription_bad_audio_400(client):
-    r = client.post("/v1/audio/transcriptions",
-                    files={"file": ("a.wav", b"bad", "audio/wav")})
+    r = client.post("/v1/audio/transcriptions", files={"file": ("a.wav", b"bad", "audio/wav")})
     assert r.status_code == 400
 
 
 def test_speech_wav_streams_valid_container(client):
-    r = client.post("/v1/audio/speech",
-                    json={"model": "m", "input": "hi there", "response_format": "wav"})
+    r = client.post(
+        "/v1/audio/speech", json={"model": "m", "input": "hi there", "response_format": "wav"}
+    )
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("audio/wav")
     # Body should be a parseable WAV once fully read (via helper for full-buffer).
     body = r.content
     assert body[:4] == b"RIFF" and body[8:12] == b"WAVE"
+
+
+def test_speech_pcm_declares_audio_format(client):
+    r = client.post(
+        "/v1/audio/speech",
+        json={"model": "m", "input": "hi there", "response_format": "pcm"},
+    )
+    assert r.status_code == 200
+    assert r.headers["x-audio-sample-rate"] == "24000"
+    assert r.headers["x-audio-channels"] == "1"
+    assert r.headers["x-audio-sample-format"] == "s16le"
 
 
 def test_speech_empty_input_400(client):
@@ -63,22 +94,36 @@ def test_speech_empty_input_400(client):
 
 
 def test_speech_bad_format_400(client):
-    r = client.post("/v1/audio/speech",
-                    json={"model": "m", "input": "hi", "response_format": "ogg"})
+    r = client.post(
+        "/v1/audio/speech", json={"model": "m", "input": "hi", "response_format": "ogg"}
+    )
     assert r.status_code == 400
 
 
 def test_transcription_oversized_upload_413(client):
     # Create fake upload larger than 25 MB limit (25 * 1024 * 1024 + 1 byte)
     oversized = b"x" * (25 * 1024 * 1024 + 1)
-    r = client.post("/v1/audio/transcriptions",
-                    files={"file": ("a.wav", oversized, "audio/wav")})
+    r = client.post("/v1/audio/transcriptions", files={"file": ("a.wav", oversized, "audio/wav")})
     assert r.status_code == 413
 
 
 def test_speech_overlong_input_400(client):
     # Input longer than 4000 character default limit
     long_input = "x" * 4001
-    r = client.post("/v1/audio/speech",
-                    json={"model": "m", "input": long_input, "response_format": "wav"})
+    r = client.post(
+        "/v1/audio/speech", json={"model": "m", "input": long_input, "response_format": "wav"}
+    )
     assert r.status_code == 400
+
+
+def test_optional_api_key_protects_audio_endpoints(settings_factory):
+    settings = settings_factory(api_key="test-secret")
+    client = TestClient(create_app(FakeStt(), FakeTts(), settings))
+    assert client.get("/health").status_code == 200
+    assert client.post("/v1/audio/speech", json={"input": "hello"}).status_code == 401
+    authorized = client.post(
+        "/v1/audio/speech",
+        headers={"Authorization": "Bearer test-secret"},
+        json={"input": "hello"},
+    )
+    assert authorized.status_code == 200

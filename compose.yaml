@@ -3,12 +3,38 @@ services:
     build: .
     image: voicebox:latest
     ports:
-      - "8790:8790"
+      - "${VOICEBOX_BIND_ADDRESS:-127.0.0.1}:8790:8790"
+    environment:
+      VOICEBOX_API_KEY: "${VOICEBOX_API_KEY:-}"
+      VOICEBOX_CPU_THREADS: "${VOICEBOX_CPU_THREADS:-4}"
+      VOICEBOX_DEFAULT_VOICE: "${VOICEBOX_DEFAULT_VOICE:-af_heart}"
+      VOICEBOX_DEVICE: "${VOICEBOX_DEVICE:-cpu}"
+      VOICEBOX_MAX_AUDIO_SECONDS: "${VOICEBOX_MAX_AUDIO_SECONDS:-120}"
+      VOICEBOX_MAX_INPUT_CHARS: "${VOICEBOX_MAX_INPUT_CHARS:-4000}"
+      VOICEBOX_MAX_UPLOAD_MB: "${VOICEBOX_MAX_UPLOAD_MB:-25}"
+      VOICEBOX_PIPER_LENGTH_SCALE: "${VOICEBOX_PIPER_LENGTH_SCALE:-1.0}"
+      VOICEBOX_PIPER_MODEL_REVISION: "${VOICEBOX_PIPER_MODEL_REVISION:-5b44ec7bab7c5822cfec48fbd5aa99db71a823d6}"
+      VOICEBOX_PIPER_NOISE_SCALE: "${VOICEBOX_PIPER_NOISE_SCALE:-0.667}"
+      VOICEBOX_PIPER_NOISE_W: "${VOICEBOX_PIPER_NOISE_W:-0.8}"
+      VOICEBOX_PIPER_VOICE: "${VOICEBOX_PIPER_VOICE:-en_US-amy-medium}"
+      VOICEBOX_STT_BEAM_SIZE: "${VOICEBOX_STT_BEAM_SIZE:-1}"
+      VOICEBOX_STT_HOTWORDS: "${VOICEBOX_STT_HOTWORDS:-}"
+      VOICEBOX_STT_MIN_SILENCE_MS: "${VOICEBOX_STT_MIN_SILENCE_MS:-500}"
+      VOICEBOX_STT_MODEL: "${VOICEBOX_STT_MODEL:-Systran/faster-distil-whisper-small.en}"
+      VOICEBOX_STT_MODEL_REVISION: "${VOICEBOX_STT_MODEL_REVISION:-ef77d90526ccd62cde3808ee70626a01e5cf83e4}"
+      VOICEBOX_STT_VAD_FILTER: "${VOICEBOX_STT_VAD_FILTER:-true}"
+      VOICEBOX_TTS_ENGINE: "${VOICEBOX_TTS_ENGINE:-piper}"
+      VOICEBOX_TTS_MODEL: "${VOICEBOX_TTS_MODEL:-speaches-ai/Kokoro-82M-v1.0-ONNX}"
+      VOICEBOX_TTS_MODEL_REVISION: "${VOICEBOX_TTS_MODEL_REVISION:-dc196c76d64fed9203906231372bcb98135815df}"
     restart: unless-stopped
+    cpus: "${VOICEBOX_CPUS:-4.0}"
+    mem_limit: 4g
+    security_opt:
+      - no-new-privileges:true
     deploy:
       resources:
         limits:
-          cpus: "6"
+          cpus: "4"
           memory: 4g
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8790/health"]

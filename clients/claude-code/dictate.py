@@ -2,15 +2,18 @@
 """
 Local dictation helper for Claude Code: record mic or transcribe a file via voicebox STT.
 """
+
 import sys
 import os
 import json
 import argparse
+import io
 import subprocess
-import tempfile
-from pathlib import Path
+import threading
+import uuid
+import wave
 from urllib.request import Request, urlopen
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 
 def get_voicebox_url():
@@ -24,7 +27,7 @@ def transcribe_audio(audio_bytes):
     endpoint = f"{voicebox_url}/v1/audio/transcriptions"
 
     # Build multipart form data
-    boundary = "----voicebox_boundary"
+    boundary = f"----voicebox-{uuid.uuid4().hex}"
     body = (
         f"--{boundary}\r\n"
         'Content-Disposition: form-data; name="file"; filename="audio.wav"\r\n'
@@ -40,19 +43,22 @@ def transcribe_audio(audio_bytes):
         f"--{boundary}--\r\n"
     ).encode()
 
+    headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    api_key = os.environ.get("VOICEBOX_API_KEY")
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
     try:
         req = Request(
             endpoint,
             data=body,
-            headers={
-                "Content-Type": f"multipart/form-data; boundary={boundary}",
-            },
+            headers=headers,
             method="POST",
         )
         with urlopen(req, timeout=30) as response:
             result = json.loads(response.read().decode())
             return result.get("text", "")
-    except (URLError, json.JSONDecodeError, Exception) as e:
+    except (HTTPError, URLError, json.JSONDecodeError) as e:
         print(f"Error transcribing audio: {e}", file=sys.stderr)
         sys.exit(1)
 
@@ -61,11 +67,11 @@ def record_from_mic():
     """Record audio from microphone using sounddevice."""
     try:
         import sounddevice
-        import scipy.io.wavfile
+        import numpy as np
     except ImportError:
         print(
-            "Error: sounddevice and scipy required for microphone recording.\n"
-            "Install with: pip install sounddevice scipy\n"
+            "Error: sounddevice and numpy are required for microphone recording.\n"
+            "Install with: pip install sounddevice numpy\n"
             "Or use --file mode to transcribe an existing WAV file.",
             file=sys.stderr,
         )
@@ -74,25 +80,26 @@ def record_from_mic():
     sample_rate = 16000
     print("🎤 recording… press Enter to stop", file=sys.stderr, flush=True)
 
-    # Record until user presses Enter (non-blocking on separate thread)
-    import threading
-
     frames = []
     stop_event = threading.Event()
+    recording_error = []
 
     def record_thread():
         try:
             with sounddevice.InputStream(
-                channels=1, samplerate=sample_rate, blocksize=4096
+                channels=1,
+                samplerate=sample_rate,
+                blocksize=480,
+                dtype="int16",
+                latency="low",
             ) as stream:
                 while not stop_event.is_set():
-                    data, overflowed = stream.read(4096)
+                    data, overflowed = stream.read(480)
                     if overflowed:
                         print("Warning: audio buffer overflow", file=sys.stderr)
-                    frames.append(data)
+                    frames.append(data.copy())
         except Exception as e:
-            print(f"Recording error: {e}", file=sys.stderr)
-            sys.exit(1)
+            recording_error.append(e)
 
     # Start recording in background
     thread = threading.Thread(target=record_thread, daemon=True)
@@ -107,28 +114,22 @@ def record_from_mic():
     stop_event.set()
     thread.join(timeout=1)
 
+    if recording_error:
+        print(f"Recording error: {recording_error[0]}", file=sys.stderr)
+        sys.exit(1)
     if not frames:
         print("No audio recorded.", file=sys.stderr)
         sys.exit(1)
 
     # Combine frames into a single array
-    import numpy as np
     audio_data = np.concatenate(frames)
-
-    # Write to a temporary WAV file
-    tmpfile = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-    tmpfile_path = tmpfile.name
-    tmpfile.close()
-
-    try:
-        scipy.io.wavfile.write(tmpfile_path, sample_rate, audio_data)
-        with open(tmpfile_path, "rb") as f:
-            return f.read()
-    finally:
-        try:
-            os.unlink(tmpfile_path)
-        except Exception:
-            pass
+    wav_buffer = io.BytesIO()
+    with wave.open(wav_buffer, "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(audio_data.tobytes())
+    return wav_buffer.getvalue()
 
 
 def copy_to_clipboard(text):
@@ -143,9 +144,7 @@ def copy_to_clipboard(text):
 
     # Try xclip (Linux X11)
     try:
-        process = subprocess.Popen(
-            ["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE
-        )
+        process = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE)
         process.communicate(text.encode())
         return
     except FileNotFoundError:
@@ -161,16 +160,13 @@ def copy_to_clipboard(text):
 
     # Clipboard not available; just warn
     print(
-        "Warning: clipboard tools (pbcopy/xclip/wl-copy) not found. "
-        "Text not copied to clipboard.",
+        "Warning: clipboard tools (pbcopy/xclip/wl-copy) not found. Text not copied to clipboard.",
         file=sys.stderr,
     )
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Transcribe audio via voicebox (local STT)"
-    )
+    parser = argparse.ArgumentParser(description="Transcribe audio via voicebox (local STT)")
     parser.add_argument(
         "--file",
         type=str,

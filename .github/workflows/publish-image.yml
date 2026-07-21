@@ -19,7 +19,26 @@ env:
   IMAGE_NAME: ${{ github.repository }}   # -> ghcr.io/<owner>/voicebox
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Validate
+        run: |
+          ruff check .
+          ruff format --check src tests clients scripts
+          pytest -q -m "not model and not latency"
+          bash -n clients/claude-code/speak.sh
+          docker compose config -q
+
   build-push:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -2,9 +2,7 @@
 Integration test for voice chat with mocked LLM (tests --text --no-audio mode).
 """
 
-import sys
-from unittest.mock import Mock, patch, MagicMock
-from pipeline import parse_sse_stream, strip_reasoning, SentenceChunker
+from pipeline import ReasoningFilter, SentenceChunker, parse_sse_stream, strip_reasoning
 
 
 def test_text_mode_with_reasoning_stripping():
@@ -17,7 +15,7 @@ def test_text_mode_with_reasoning_stripping():
         b'data: {"choices":[{"delta":{"content":"</think>"}}]}\n',
         b'data: {"choices":[{"delta":{"content":"The answer is: vectors"}}]}\n',
         b'data: {"choices":[{"delta":{"content":" are arrays."}}]}\n',
-        b'data: [DONE]\n',
+        b"data: [DONE]\n",
     ]
 
     # Parse and strip
@@ -40,13 +38,11 @@ def test_text_mode_sentence_parsing():
         b'data: {"choices":[{"delta":{"content":"First sentence."}}]}\n',
         b'data: {"choices":[{"delta":{"content":" Second sentence."}}]}\n',
         b'data: {"choices":[{"delta":{"content":" Final one!"}}]}\n',
-        b'data: [DONE]\n',
+        b"data: [DONE]\n",
     ]
 
     # Parse LLM response
     tokens = list(parse_sse_stream(iter(mock_response)))
-    full_text = "".join(tokens)
-
     # Chunk into sentences
     chunker = SentenceChunker()
     sentences = []
@@ -67,7 +63,7 @@ def test_text_mode_with_abbreviation():
     mock_response = [
         b'data: {"choices":[{"delta":{"content":"The U.S."}}]}\n',
         b'data: {"choices":[{"delta":{"content":" is great."}}]}\n',
-        b'data: [DONE]\n',
+        b"data: [DONE]\n",
     ]
 
     tokens = list(parse_sse_stream(iter(mock_response)))
@@ -92,7 +88,7 @@ def test_full_pipeline_integration():
         b'data: {"choices":[{"delta":{"content":"A vector database"}}]}\n',
         b'data: {"choices":[{"delta":{"content":" stores embeddings."}}]}\n',
         b'data: {"choices":[{"delta":{"content":" U.S. companies use them."}}]}\n',
-        b'data: [DONE]\n',
+        b"data: [DONE]\n",
     ]
 
     # Full pipeline
@@ -100,11 +96,16 @@ def test_full_pipeline_integration():
     sentences = []
     chunker = SentenceChunker()
 
+    reasoning_filter = ReasoningFilter()
     for token in parse_sse_stream(iter(mock_response)):
-        clean = strip_reasoning(token)
+        clean = reasoning_filter.feed(token)
         all_text += clean
         for sentence in chunker.feed(clean):
             sentences.append(sentence)
+
+    trailing = reasoning_filter.flush()
+    all_text += trailing
+    sentences.extend(chunker.feed(trailing))
 
     remainder = chunker.flush()
     if remainder:

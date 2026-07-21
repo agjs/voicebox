@@ -30,8 +30,16 @@ class PiperTtsEngine:
             from piper import PiperVoice, SynthesisConfig
 
             # Resolve baked voice files from the HF cache (respects HF_HUB_OFFLINE=1).
-            voice_onnx = hf_hub_download(repo_id=_PIPER_REPO, filename=onnx_rel)
-            voice_json = hf_hub_download(repo_id=_PIPER_REPO, filename=json_rel)
+            voice_onnx = hf_hub_download(
+                repo_id=_PIPER_REPO,
+                filename=onnx_rel,
+                revision=settings.piper_model_revision,
+            )
+            voice_json = hf_hub_download(
+                repo_id=_PIPER_REPO,
+                filename=json_rel,
+                revision=settings.piper_model_revision,
+            )
             self.piper_voice = PiperVoice.load(voice_onnx, config_path=voice_json)
             # length_scale < 1.0 speaks faster; noise_scale/noise_w_scale are
             # Piper's prosody knobs (defaults 0.667 / 0.8).
@@ -58,9 +66,7 @@ class PiperTtsEngine:
         sentences = split_sentences(text)
         if not sentences:
             raise ValueError("input text is empty")
-        # One int16-LE mono PCM chunk per sentence (playback can start on sentence 1).
+        # Forward Piper's int16-LE chunks immediately for true low-latency PCM playback.
         for sentence in sentences:
-            pcm = bytearray()
             for chunk in self.piper_voice.synthesize(sentence, syn_config=self._syn_config):
-                pcm += chunk.audio_int16_bytes
-            yield bytes(pcm)
+                yield chunk.audio_int16_bytes

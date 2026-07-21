@@ -12,11 +12,19 @@ def test_split_single_sentence_no_terminator():
     assert split_sentences("just one clause") == ["just one clause"]
 
 
+def test_split_preserves_decimals_and_abbreviations():
+    assert split_sentences("Version 3.14 is current. The U.S. release follows.") == [
+        "Version 3.14 is current.",
+        "The U.S. release follows.",
+    ]
+
+
 @pytest.fixture(scope="module")
 def engine():
     return TtsEngine(load_settings())
 
 
+@pytest.mark.model
 def test_streams_one_chunk_per_sentence(engine):
     chunks = list(engine.synthesize_stream("Hello there. How are you?"))
     assert len(chunks) == 2
@@ -25,6 +33,7 @@ def test_streams_one_chunk_per_sentence(engine):
     assert all(len(c) % 2 == 0 for c in chunks)
 
 
+@pytest.mark.model
 def test_empty_text_raises(engine):
     with pytest.raises(ValueError):
         list(engine.synthesize_stream("   "))

@@ -6,10 +6,14 @@ from voicebox.config import load_settings
 from voicebox.stt import SttEngine
 from voicebox.tts import TtsEngine
 
-pytestmark = pytest.mark.skipif(
-    os.getenv("VOICEBOX_SKIP_LATENCY") == "1",
-    reason="latency guard skipped on this host",
-)
+pytestmark = [
+    pytest.mark.model,
+    pytest.mark.latency,
+    pytest.mark.skipif(
+        os.getenv("VOICEBOX_SKIP_LATENCY") == "1",
+        reason="latency guard skipped on this host",
+    ),
+]
 
 
 def _wav_seconds(path):

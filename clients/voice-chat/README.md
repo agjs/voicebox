@@ -8,7 +8,7 @@ The voice chat client implements a full end-to-end pipeline:
 
 ```
 Mic (16 kHz mono) → VAD endpointing → voicebox STT → local LLM (streamed)
-→ incremental sentence parser → voicebox streaming TTS → non-blocking playback
+→ incremental sentence parser → background voicebox TTS → queued PCM playback
 ```
 
 Key features:
@@ -29,7 +29,7 @@ Key features:
 
 2. Add optional audio dependencies:
    ```bash
-   pip install sounddevice numpy webrtcvad
+   pip install sounddevice numpy webrtcvad httpx
    ```
    - `sounddevice`: mic input and audio playback
    - `numpy`: audio array operations
@@ -37,7 +37,7 @@ Key features:
 
    For text-only mode without audio:
    ```bash
-   pip install requests  # or use stdlib urllib (included)
+   pip install -e .       # httpx is part of the base voicebox dependencies
    ```
 
 ## Configuration
@@ -49,11 +49,16 @@ All configuration is via environment variables (defaults are generic):
 | `VOICEBOX_URL` | `http://localhost:8790` | voicebox server URL (STT/TTS) |
 | `VOICEBOX_LLM_URL` | `http://localhost:8000/v1/chat/completions` | LLM endpoint (OpenAI-compatible) |
 | `VOICEBOX_LLM_MODEL` | `local-model` | LLM model name |
-| `VOICEBOX_VOICE` | `af_heart` | TTS voice ID |
-| `VOICEBOX_SILENCE_MS` | `1500` | Silence threshold (milliseconds) for VAD endpointing |
+| `VOICEBOX_VOICE` | `en_US-amy-medium` | TTS voice ID (Piper uses its server-configured voice) |
+| `VOICEBOX_SILENCE_MS` | `700` | Silence required to end a turn |
+| `VOICEBOX_PRE_ROLL_MS` | `300` | Audio retained before speech detection |
+| `VOICEBOX_POST_ROLL_MS` | `200` | Silence retained after speech |
+| `VOICEBOX_VAD_AGGRESSIVENESS` | `2` | WebRTC VAD mode, 0 through 3 |
+| `VOICEBOX_MAX_HISTORY_TURNS` | `8` | Conversation turns retained for LLM latency control |
+| `VOICEBOX_SHOW_TIMINGS` | `0` | Set to `1` for STT, first-token, and first-audio timings |
 | `VOICEBOX_SYSTEM_PROMPT` | (see below) | System prompt for LLM |
 
-Default system prompt: `"You are a helpful assistant."`
+Default system prompt asks for concise plain text suitable for speech.
 
 ## Usage
 
@@ -64,10 +69,10 @@ python clients/voice-chat/voice_chat.py
 ```
 
 Starts a loop:
-1. **Record**: Prompts you to speak (records until ~1.5s of silence is detected)
+1. **Record**: Waits for speech and ends after about 700 ms of silence
 2. **Transcribe**: Sends audio to voicebox STT
 3. **Stream LLM**: Sends your utterance + chat history to the LLM
-4. **Synthesize & play**: As the LLM generates, sentences are parsed and synthesized incrementally; playback begins while generation continues
+4. **Synthesize & play**: A TTS worker and persistent PCM output stream run while LLM generation continues
 5. **Repeat**: Ready for next turn
 
 Press `Ctrl-C` to exit cleanly.
@@ -110,7 +115,7 @@ All functions are vendor-neutral, network-free, and unit-testable:
 
 - **`parse_sse_stream(chunks)`**: Parses OpenAI-style `data: {...}` SSE lines from streamed LLM responses. Yields text tokens, stops on `[DONE]`, ignores keep-alives.
   
-- **`strip_reasoning(text)`**: Removes `<think>...</think>` blocks and stray tags (DOTALL regex) so reasoning-enabled models don't speak their thoughts.
+- **`ReasoningFilter`**: Stateful removal of `<think>...</think>` blocks even when tags are split across network chunks.
   
 - **`SentenceChunker`**: Incremental state machine. Call `.feed(text)` to process streamed text; emits complete sentences on `.?!` or newline boundaries. Includes a min-length guard to avoid over-splitting on abbreviations like "U.S." Flush with `.flush()` at end of stream to get any remainder.
 
@@ -121,9 +126,9 @@ Main entry point combining the pipeline, voicebox APIs, and audio I/O:
 - **`VoiceChat` class**: Manages chat history, HTTP requests, audio I/O
   - `record_from_mic()`: Records from the default device using VAD (webrtcvad if available, else energy-based fallback)
   - `transcribe(audio_bytes)`: POSTs to voicebox STT
-  - `stream_llm_response(messages)`: Streams from LLM endpoint (yields raw HTTP response lines)
-  - `synthesize_speech(text)`: POSTs to voicebox TTS (returns 24 kHz PCM)
-  - `play_audio(bytes, sample_rate)`: Non-blocking playback via sounddevice
+  - `stream_llm_response(messages)`: Streams bytes from the LLM endpoint
+  - `stream_speech(text)`: Streams PCM and reads its sample rate from response headers
+  - `PcmPlayback`: Writes every sentence to one persistent `RawOutputStream`
   
 - **Three run modes**:
   - `run_interactive()`: Mic loop
@@ -158,12 +163,14 @@ If you need barge-in, a `--barge-in` flag can be added to enable a parallel VAD 
 ## Latency & Performance
 
 Expected latency (turn-taking mode):
-- **Mic recording**: ~1–3 seconds (waits for silence threshold)
+- **Mic endpoint delay**: ~0.7 seconds after speech (configurable)
 - **STT roundtrip**: ~0.5–2 seconds (model + network)
 - **LLM generation**: dominant factor, often 5–30 seconds depending on model and response length
-- **TTS streaming**: begins immediately as sentences arrive; 24 kHz PCM playback is real-time
+- **TTS streaming**: begins immediately as sentences arrive; the server declares the PCM rate
 
-Sentences are synthesized in parallel with LLM generation, so you hear the first sentence while the LLM is still thinking. Non-blocking playback ensures the main loop doesn't stall.
+Sentences are synthesized in parallel with LLM generation and written to a single
+queued output stream. Playback is gapless, later sentences cannot interrupt earlier
+ones, and the microphone does not reopen until playback finishes.
 
 ## Error Handling
 
@@ -175,7 +182,7 @@ Sentences are synthesized in parallel with LLM generation, so you hear the first
 ## Constraints & Design
 
 - **Vendor-neutral**: No hardcoded IPs, hostnames, or personal infra. All endpoints via generic env vars with sensible defaults.
-- **Open-source clean**: Uses stdlib `urllib` for HTTP by default (respects `requests` if available, but doesn't require it).
+- **Connection reuse**: One thread-safe `httpx.Client` serves STT, LLM streaming, and background TTS.
 - **Lazy loading**: Audio libraries imported only when needed (`--text --no-audio` works without sounddevice).
 - **Testable**: Pure pipeline logic has no side effects; integration is in the CLI.
 
@@ -185,7 +192,7 @@ Sentences are synthesized in parallel with LLM generation, so you hear the first
 $ export VOICEBOX_SYSTEM_PROMPT="You are a pirate. Respond briefly."
 $ python clients/voice-chat/voice_chat.py
 Voice Chat CLI (Ctrl-C to exit)
-Recording... (Ctrl-C to stop)
+Recording... (speak, then pause; Ctrl-C to cancel)
 Silence detected.
 User: What is machine learning?
 Assistant: Arr, 'tis the art of teaching scurvy machines to learn without explicit orders, ye scallywag!
