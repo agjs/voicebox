@@ -33,8 +33,13 @@ class PiperTtsEngine:
             voice_onnx = hf_hub_download(repo_id=_PIPER_REPO, filename=onnx_rel)
             voice_json = hf_hub_download(repo_id=_PIPER_REPO, filename=json_rel)
             self.piper_voice = PiperVoice.load(voice_onnx, config_path=voice_json)
-            # Speaking rate: length_scale < 1.0 speaks faster.
-            self._syn_config = SynthesisConfig(length_scale=settings.piper_length_scale)
+            # length_scale < 1.0 speaks faster; noise_scale/noise_w_scale are
+            # Piper's prosody knobs (defaults 0.667 / 0.8).
+            self._syn_config = SynthesisConfig(
+                length_scale=settings.piper_length_scale,
+                noise_scale=settings.piper_noise_scale,
+                noise_w_scale=settings.piper_noise_w,
+            )
             with open(voice_json) as f:
                 cfg = json.load(f)
             self.sample_rate = int(cfg.get("audio", {}).get("sample_rate", 22050))

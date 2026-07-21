@@ -14,12 +14,15 @@ print("Downloading TTS model files...")
 hf_hub_download(s.tts_model, "model.onnx")
 hf_hub_download(s.tts_model, "voices.bin")
 
-# TTS (Piper): the voice files PiperTtsEngine loads at runtime
+# TTS (Piper): bake the configured voice plus a couple of good medium voices so
+# they can be selected at runtime (VOICEBOX_PIPER_VOICE) with no rebuild.
 from voicebox.tts_piper import piper_voice_relpaths
 
-print("Downloading Piper voice model...")
-_onnx_rel, _json_rel = piper_voice_relpaths(s.piper_voice)
-hf_hub_download(repo_id="rhasspy/piper-voices", filename=_onnx_rel)
-hf_hub_download(repo_id="rhasspy/piper-voices", filename=_json_rel)
+_piper_voices = {s.piper_voice, "en_US-amy-medium", "en_US-lessac-medium"}
+for _voice in sorted(_piper_voices):
+    print(f"Downloading Piper voice {_voice}...")
+    _onnx_rel, _json_rel = piper_voice_relpaths(_voice)
+    hf_hub_download(repo_id="rhasspy/piper-voices", filename=_onnx_rel)
+    hf_hub_download(repo_id="rhasspy/piper-voices", filename=_json_rel)
 
 print("models cached")

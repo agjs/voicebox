@@ -10,6 +10,8 @@ class Settings:
     tts_engine: str
     piper_voice: str
     piper_length_scale: float
+    piper_noise_scale: float
+    piper_noise_w: float
     default_voice: str
     port: int
     device: str
@@ -27,6 +29,9 @@ def load_settings() -> Settings:
         piper_voice=os.getenv("VOICEBOX_PIPER_VOICE", "en_US-amy-medium"),
         # Piper speaking rate: <1.0 = faster speech, >1.0 = slower. 1.0 = voice default.
         piper_length_scale=float(os.getenv("VOICEBOX_PIPER_LENGTH_SCALE", "1.0")),
+        # Piper prosody randomness (0.667) and duration variability (0.8) — Piper defaults.
+        piper_noise_scale=float(os.getenv("VOICEBOX_PIPER_NOISE_SCALE", "0.667")),
+        piper_noise_w=float(os.getenv("VOICEBOX_PIPER_NOISE_W", "0.8")),
         default_voice=os.getenv("VOICEBOX_DEFAULT_VOICE", "af_heart"),
         port=int(os.getenv("VOICEBOX_PORT", "8790")),
         device=os.getenv("VOICEBOX_DEVICE", "cpu"),
