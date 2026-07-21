@@ -1,0 +1,21 @@
+# Keep the Docker build context small and reproducible.
+.git
+.venv
+venv
+models
+hf-cache
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.superpowers
+docs
+tests
+*.wav
+*.mp3
+*.pcm
+.env
+.env.*
+!.env.example
+.DS_Store
