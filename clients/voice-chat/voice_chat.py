@@ -330,22 +330,20 @@ class VoiceChat:
                         clean_token = strip_reasoning(token)
                         assistant_text_full += clean_token
 
-                        # Feed to sentence chunker and play sentences
+                        # Synthesize+play each completed sentence (audio-only;
+                        # display comes from the progressive raw-token print below)
                         for sentence in chunker.feed(clean_token):
-                            print(sentence, end=" ", flush=True)
-                            # Synthesize and play in the background
                             if self.use_audio:
                                 pcm_audio = self.synthesize_speech(sentence)
                                 if pcm_audio:
                                     self.play_audio(pcm_audio)
 
-                        # Print any tokens that don't form sentences yet
+                        # Progressive display of the streamed reply
                         print(clean_token, end="", flush=True)
 
-                    # Flush remaining text
+                    # Flush remaining text (speak the trailing partial sentence)
                     remainder = chunker.flush()
                     if remainder:
-                        print(remainder, end=" ", flush=True)
                         if self.use_audio:
                             pcm_audio = self.synthesize_speech(remainder)
                             if pcm_audio:
@@ -384,7 +382,6 @@ class VoiceChat:
                 assistant_text_full += clean_token
 
                 for sentence in chunker.feed(clean_token):
-                    print(sentence, end=" ", flush=True)
                     if self.use_audio:
                         pcm_audio = self.synthesize_speech(sentence)
                         if pcm_audio:
@@ -394,7 +391,6 @@ class VoiceChat:
 
             remainder = chunker.flush()
             if remainder:
-                print(remainder, end=" ", flush=True)
                 if self.use_audio:
                     pcm_audio = self.synthesize_speech(remainder)
                     if pcm_audio:
