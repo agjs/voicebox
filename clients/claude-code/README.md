@@ -57,9 +57,9 @@ export VOICEBOX_URL=http://<host>:8790
 ```
 
 You can also customize:
-- `VOICEBOX_VOICE` (default: `af_heart`) — voice identifier
-- `VOICEBOX_SPEAK_MAX_CHARS` (default: `600`) — character limit for spoken text
-- `VOICEBOX_LOG` (default: `/dev/null`) — optional log file for debugging
+- `VOICEBOX_VOICE` (default: `af_heart`): voice identifier
+- `VOICEBOX_SPEAK_MAX_CHARS` (default: `600`): character limit for spoken text
+- `VOICEBOX_LOG` (default: `/dev/null`): optional log file for debugging
 
 ## Dictation
 

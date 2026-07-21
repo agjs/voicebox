@@ -1,4 +1,4 @@
-# Voice Chat Client — Turn-Taking CLI
+# Voice Chat Client: Turn-Taking CLI
 
 A conversational CLI that lets you talk to a local LLM and hear spoken replies, using the voicebox speech server for STT (speech-to-text) and streaming TTS (text-to-speech).
 
@@ -104,7 +104,7 @@ python clients/voice-chat/voice_chat.py --file path/to/audio.wav --no-audio
 
 ## Architecture
 
-### `pipeline.py` — Pure, Testable Logic
+### `pipeline.py`: Pure, Testable Logic
 
 All functions are vendor-neutral, network-free, and unit-testable:
 
@@ -114,7 +114,7 @@ All functions are vendor-neutral, network-free, and unit-testable:
   
 - **`SentenceChunker`**: Incremental state machine. Call `.feed(text)` to process streamed text; emits complete sentences on `.?!` or newline boundaries. Includes a min-length guard to avoid over-splitting on abbreviations like "U.S." Flush with `.flush()` at end of stream to get any remainder.
 
-### `voice_chat.py` — CLI & Integration
+### `voice_chat.py`: CLI & Integration
 
 Main entry point combining the pipeline, voicebox APIs, and audio I/O:
 
@@ -132,7 +132,7 @@ Main entry point combining the pipeline, voicebox APIs, and audio I/O:
 
 Lazy imports ensure audio libraries aren't required for text-only usage.
 
-### `test_pipeline.py` — Unit Tests
+### `test_pipeline.py`: Unit Tests
 
 Full coverage of the pure pipeline logic:
 - SSE parsing (multiline, keep-alives, malformed JSON, [DONE] marker)

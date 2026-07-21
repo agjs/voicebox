@@ -25,11 +25,11 @@ def load_settings() -> Settings:
     return Settings(
         stt_model=os.getenv("VOICEBOX_STT_MODEL", "Systran/faster-distil-whisper-small.en"),
         tts_model=os.getenv("VOICEBOX_TTS_MODEL", "speaches-ai/Kokoro-82M-v1.0-ONNX"),
-        tts_engine=os.getenv("VOICEBOX_TTS_ENGINE", "kokoro"),
+        tts_engine=os.getenv("VOICEBOX_TTS_ENGINE", "piper"),
         piper_voice=os.getenv("VOICEBOX_PIPER_VOICE", "en_US-amy-medium"),
         # Piper speaking rate: <1.0 = faster speech, >1.0 = slower. 1.0 = voice default.
         piper_length_scale=float(os.getenv("VOICEBOX_PIPER_LENGTH_SCALE", "1.0")),
-        # Piper prosody randomness (0.667) and duration variability (0.8) — Piper defaults.
+        # Piper prosody randomness (0.667) and duration variability (0.8); Piper defaults.
         piper_noise_scale=float(os.getenv("VOICEBOX_PIPER_NOISE_SCALE", "0.667")),
         piper_noise_w=float(os.getenv("VOICEBOX_PIPER_NOISE_W", "0.8")),
         default_voice=os.getenv("VOICEBOX_DEFAULT_VOICE", "af_heart"),

@@ -51,7 +51,7 @@ def create_app(stt, tts, settings: Settings) -> FastAPI:
         if response_format == "wav":
             # Buffer to a COMPLETE, correctly-sized WAV. Synthesis is fast, and a
             # proper header (real RIFF/data sizes) is what strict decoders like
-            # Open WebUI's Web Audio path require — a streaming placeholder-size
+            # Open WebUI's Web Audio path require; a streaming placeholder-size
             # header decodes to distorted audio there.
             pcm = b"".join(tts.synthesize_stream(text, voice))
             return Response(content=pcm_to_wav_bytes(pcm, tts.sample_rate),

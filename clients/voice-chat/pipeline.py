@@ -1,6 +1,6 @@
 """
 Pure, testable pipeline logic for voice chat client.
-No network, no audio—just SSE parsing, reasoning stripping, and sentence chunking.
+No network, no audio, just SSE parsing, reasoning stripping, and sentence chunking.
 """
 
 import json
