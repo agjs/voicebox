@@ -14,8 +14,20 @@ class AudioTooLongError(ValueError):
 
 
 def _duration_seconds(audio: bytes) -> float | None:
-    """Best-effort duration for WAV; returns None for other containers."""
+    """Best-effort duration for WAV; returns None for other containers or streaming WAVs.
+
+    Streaming WAVs have placeholder sizes (0xFFFFFFFF) in the RIFF/data chunks,
+    which cause Python's wave module to miscompute duration. Detect and skip them.
+    """
     try:
+        # Check for streaming WAV with placeholder sizes (0xFFFFFFFF)
+        if len(audio) >= 40:
+            # RIFF size at bytes 4-7, data size at bytes 36-39
+            riff_size = int.from_bytes(audio[4:8], "little")
+            data_size = int.from_bytes(audio[36:40], "little")
+            if riff_size == 0xFFFFFFFF or data_size == 0xFFFFFFFF:
+                # Streaming WAV with placeholders; can't determine duration
+                return None
         with wave.open(io.BytesIO(audio), "rb") as w:
             return w.getnframes() / float(w.getframerate())
     except Exception:

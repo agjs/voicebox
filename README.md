@@ -29,6 +29,37 @@ and custom harnesses plug into the same server directly.
 - `POST /v1/audio/speech` — `{input, voice, ...}` → streamed audio
 - `GET /health`
 
+## Quick start
+
+### Speech synthesis (TTS)
+
+```bash
+curl http://localhost:8790/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{"input":"hello world","response_format":"wav"}' \
+  --output out.wav
+
+# Play
+ffplay out.wav
+```
+
+**Streaming WAV note:** The WAV response is streamed with placeholder size fields
+in the RIFF and data chunks (standard for streaming; the actual size is unknown
+before streaming completes). It plays correctly in ffmpeg-based players
+(ffplay, afplay, mpv, browsers) and round-trips correctly through the
+transcription endpoint. However, strict parsers that trust the declared sizes
+(e.g., Python's `wave` module) may reject a saved file. For byte-exact or
+random-access needs, request `response_format=pcm` instead (raw 24 kHz 16-bit
+mono PCM, no header).
+
+### Speech transcription (STT)
+
+```bash
+curl -X POST http://localhost:8790/v1/audio/transcriptions \
+  -F "file=@audio.wav" \
+  -F "model=base"
+```
+
 ## Hardware
 
 CPU-first, GPU-optional. English-only models by default (swappable via config).

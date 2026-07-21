@@ -9,39 +9,38 @@ echo "tts -> /tmp/vb_smoke.wav"
   --output /tmp/vb_smoke.wav \
   -d '{"model":"m","input":"Hello from voicebox. Streaming works.","response_format":"wav"}'
 
-# Fix WAV headers (TTS uses placeholder sizes for streaming)
+# Validate raw streaming WAV (no reconstruction)
 python3 << 'EOF'
 import struct
-import wave
+import os
 
-def fix_wav_headers(filename: str) -> None:
-    """Fix WAV file with placeholder RIFF/data sizes for proper codec parsing."""
+def validate_streaming_wav(filename: str) -> float:
+    """Validate raw streaming WAV with placeholder header sizes.
+
+    The WAV header contains 0xFFFFFFFF placeholders for RIFF and data sizes,
+    which is standard for streaming WAV. Compute duration from actual file size.
+    Returns: duration in seconds
+    """
     with open(filename, 'rb') as f:
         data = f.read()
 
-    # Skip 44-byte header and get raw PCM
-    pcm_data = data[44:]
+    # Validate WAV header structure
+    assert len(data) >= 44, f"WAV too short: {len(data)} bytes"
+    assert data[0:4] == b"RIFF", f"Invalid RIFF magic: {data[0:4]}"
+    assert data[8:12] == b"WAVE", f"Invalid WAVE magic: {data[8:12]}"
 
-    # Reconstruct with correct sizes
-    byte_rate = 24000 * 1 * 16 // 8
-    block_align = 1 * 16 // 8
-    data_len = len(pcm_data)
-    riff_len = 36 + data_len
+    # Compute duration from actual file size (44-byte header + PCM data)
+    # 24 kHz sample rate, 16-bit (2 bytes) mono
+    pcm_bytes = len(data) - 44
+    sample_rate = 24000
+    bytes_per_sample = 2  # 16-bit
+    duration = pcm_bytes / (sample_rate * bytes_per_sample)
 
-    fixed_wav = (
-        b"RIFF" + struct.pack("<I", riff_len) + b"WAVE"
-        + b"fmt " + struct.pack("<IHHIIHH", 16, 1, 1, 24000, byte_rate, block_align, 16)
-        + b"data" + struct.pack("<I", data_len) + pcm_data
-    )
+    assert duration > 1.0, f"Duration too short: {duration:.2f}s (expected > 1.0s)"
+    print(f"wav ok {duration:.2f}s")
+    return duration
 
-    with open(filename, 'wb') as f:
-        f.write(fixed_wav)
-
-fix_wav_headers('/tmp/vb_smoke.wav')
-w = wave.open('/tmp/vb_smoke.wav', 'rb')
-duration = w.getnframes() / w.getframerate()
-print(f'wav ok {duration:.2f}s')
-w.close()
+validate_streaming_wav('/tmp/vb_smoke.wav')
 EOF
 
 echo "stt round-trip:"
