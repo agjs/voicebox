@@ -100,7 +100,7 @@ All scripts use environment variables for configuration:
 Example:
 
 ```bash
-export VOICEBOX_URL=http://192.168.1.100:8790
+export VOICEBOX_URL=http://<host>:8790
 export VOICEBOX_VOICE=en_male
 ```
 

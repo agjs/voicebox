@@ -18,7 +18,7 @@ hf_hub_download(s.tts_model, "voices.bin")
 # they can be selected at runtime (VOICEBOX_PIPER_VOICE) with no rebuild.
 from voicebox.tts_piper import piper_voice_relpaths
 
-_piper_voices = {s.piper_voice, "en_US-amy-medium", "en_US-lessac-medium"}
+_piper_voices = {s.piper_voice, "en_US-amy-medium", "en_US-bryce-medium", "en_US-lessac-medium"}
 for _voice in sorted(_piper_voices):
     print(f"Downloading Piper voice {_voice}...")
     _onnx_rel, _json_rel = piper_voice_relpaths(_voice)
