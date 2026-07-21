@@ -40,10 +40,13 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # latest=false: this repo's GitOps policy pins numeric tags, never :latest.
+          flavor: |
+            latest=false
           tags: |
             type=semver,pattern={{version}}
             type=ref,event=branch
-            type=sha,prefix={{branch}}-,format=short
+            type=sha,prefix=sha-,format=short
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
