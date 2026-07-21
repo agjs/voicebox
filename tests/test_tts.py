@@ -30,27 +30,14 @@ def test_empty_text_raises(engine):
         list(engine.synthesize_stream("   "))
 
 
-def test_init_with_bad_model_raises_runtime_error(monkeypatch):
+def test_init_with_bad_model_raises_runtime_error(monkeypatch, settings_factory):
     from voicebox.tts import TtsEngine
-    from voicebox.config import Settings
 
     def mock_hf_hub_download(*args, **kwargs):
         raise ValueError("model not found")
 
     monkeypatch.setattr("voicebox.tts.hf_hub_download", mock_hf_hub_download)
-    settings = Settings(
-        stt_model="dummy",
-        tts_model="invalid/model",
-        tts_engine="kokoro",
-        piper_voice="en_US-lessac-high",
-        default_voice="dummy",
-        port=8790,
-        device="cpu",
-        cpu_threads=0,
-        max_audio_seconds=120,
-        max_upload_mb=25,
-        max_input_chars=4000,
-    )
+    settings = settings_factory(tts_model="invalid/model")
 
     with pytest.raises(RuntimeError) as exc_info:
         TtsEngine(settings)

@@ -10,23 +10,13 @@ def test_piper_reuses_split_sentences():
     assert len(out) == 2
 
 
-def test_piper_engine_initialization():
+def test_piper_engine_initialization(settings_factory):
     """Test PiperTtsEngine initializes with valid config."""
-    from voicebox.config import Settings
     from voicebox.tts_piper import PiperTtsEngine
 
-    settings = Settings(
-        stt_model="dummy",
-        tts_model="dummy",
+    settings = settings_factory(
         tts_engine="piper",
         piper_voice="en_US-lessac-high",
-        default_voice="dummy",
-        port=8790,
-        device="cpu",
-        cpu_threads=0,
-        max_audio_seconds=120,
-        max_upload_mb=25,
-        max_input_chars=4000,
     )
 
     try:
@@ -40,7 +30,7 @@ def test_piper_engine_initialization():
         raise
 
 
-def test_piper_sample_rate_is_positive():
+def test_piper_sample_rate_is_positive(settings_factory):
     """Test that sample_rate is set to a positive integer."""
     from voicebox.config import load_settings
     from voicebox.tts_piper import PiperTtsEngine
@@ -49,20 +39,7 @@ def test_piper_sample_rate_is_positive():
         settings = load_settings()
         if settings.tts_engine != "piper":
             # Override to test piper explicitly
-            from voicebox.config import Settings
-            settings = Settings(
-                stt_model=settings.stt_model,
-                tts_model=settings.tts_model,
-                tts_engine="piper",
-                piper_voice=settings.piper_voice,
-                default_voice=settings.default_voice,
-                port=settings.port,
-                device=settings.device,
-                cpu_threads=settings.cpu_threads,
-                max_audio_seconds=settings.max_audio_seconds,
-                max_upload_mb=settings.max_upload_mb,
-                max_input_chars=settings.max_input_chars,
-            )
+            settings = settings_factory(tts_engine="piper")
         engine = PiperTtsEngine(settings)
         assert isinstance(engine.sample_rate, int)
         assert engine.sample_rate > 0
@@ -72,23 +49,13 @@ def test_piper_sample_rate_is_positive():
         raise
 
 
-def test_piper_synthesize_stream_yields_one_chunk_per_sentence():
+def test_piper_synthesize_stream_yields_one_chunk_per_sentence(settings_factory):
     """Test that synthesize_stream yields one PCM chunk per sentence."""
-    from voicebox.config import Settings
     from voicebox.tts_piper import PiperTtsEngine
 
-    settings = Settings(
-        stt_model="dummy",
-        tts_model="dummy",
+    settings = settings_factory(
         tts_engine="piper",
         piper_voice="en_US-lessac-high",
-        default_voice="dummy",
-        port=8790,
-        device="cpu",
-        cpu_threads=0,
-        max_audio_seconds=120,
-        max_upload_mb=25,
-        max_input_chars=4000,
     )
 
     try:
@@ -104,23 +71,13 @@ def test_piper_synthesize_stream_yields_one_chunk_per_sentence():
         raise
 
 
-def test_piper_empty_text_raises():
+def test_piper_empty_text_raises(settings_factory):
     """Test that synthesize_stream raises ValueError on empty text."""
-    from voicebox.config import Settings
     from voicebox.tts_piper import PiperTtsEngine
 
-    settings = Settings(
-        stt_model="dummy",
-        tts_model="dummy",
+    settings = settings_factory(
         tts_engine="piper",
         piper_voice="en_US-lessac-high",
-        default_voice="dummy",
-        port=8790,
-        device="cpu",
-        cpu_threads=0,
-        max_audio_seconds=120,
-        max_upload_mb=25,
-        max_input_chars=4000,
     )
 
     try:
