@@ -21,10 +21,10 @@ def _duration_seconds(audio: bytes) -> float | None:
     """
     try:
         # Check for streaming WAV with placeholder sizes (0xFFFFFFFF)
-        if len(audio) >= 40:
-            # RIFF size at bytes 4-7, data size at bytes 36-39
+        if len(audio) >= 44:
+            # RIFF size at bytes 4-7, data size at bytes 40-43
             riff_size = int.from_bytes(audio[4:8], "little")
-            data_size = int.from_bytes(audio[36:40], "little")
+            data_size = int.from_bytes(audio[40:44], "little")
             if riff_size == 0xFFFFFFFF or data_size == 0xFFFFFFFF:
                 # Streaming WAV with placeholders; can't determine duration
                 return None
