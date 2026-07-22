@@ -1,4 +1,6 @@
 import io
+import threading
+import time
 import wave
 
 import numpy as np
@@ -12,18 +14,30 @@ class FakeOutputStream:
         self.chunks = []
         self.started = False
         self.stopped = False
+        self.closed = False
+        self.write_entered = threading.Event()
+        self.release_write = threading.Event()
+        self.block_write = False
 
     def start(self):
         self.started = True
 
     def write(self, chunk):
+        self.write_entered.set()
+        if self.block_write:
+            # Unblock when abort closes the stream or the test releases us.
+            while not self.release_write.wait(timeout=0.01):
+                if self.closed or self.stopped:
+                    raise OSError("stream closed during write")
         self.chunks.append(chunk)
 
     def stop(self):
         self.stopped = True
+        self.release_write.set()
 
     def close(self):
-        pass
+        self.closed = True
+        self.release_write.set()
 
 
 class FakeSoundDevice:
@@ -49,6 +63,75 @@ def test_pcm_playback_reuses_one_stream_for_same_sample_rate():
     assert stream.chunks == [b"\x01\x00", b"\x02\x00"]
     assert stream.started is True
     assert stream.stopped is True
+
+
+def test_pcm_playback_abort_unblocks_mid_write():
+    sounddevice = FakeSoundDevice()
+    playback = PcmPlayback(sounddevice)
+    playback.write(22050, b"\x01\x00")
+    deadline = time.time() + 2
+    while not sounddevice.output_streams and time.time() < deadline:
+        time.sleep(0.01)
+    stream = sounddevice.output_streams[0]
+    stream.block_write = True
+    stream.write_entered.clear()
+    playback.write(22050, b"\x02\x00")
+    assert stream.write_entered.wait(timeout=2)
+    playback.abort()
+    playback._thread.join(timeout=2)
+    assert not playback._thread.is_alive()
+    assert stream.closed is True or stream.stopped is True
+    playback.write(22050, b"\x03\x00")
+    assert b"\x03\x00" not in stream.chunks
+
+
+def test_pcm_playback_abort_drains_queued_chunks():
+    sounddevice = FakeSoundDevice()
+    playback = PcmPlayback(sounddevice)
+    playback.write(22050, b"\x01\x00")
+    deadline = time.time() + 2
+    while not sounddevice.output_streams and time.time() < deadline:
+        time.sleep(0.01)
+    stream = sounddevice.output_streams[0]
+    stream.block_write = True
+    assert stream.write_entered.wait(timeout=2)
+    playback.write(22050, b"\x02\x00")
+    playback.write(22050, b"\x03\x00")
+    playback.abort()
+    playback._thread.join(timeout=2)
+    assert playback._queue.empty()
+    assert b"\x03\x00" not in stream.chunks
+
+
+def test_cancel_mid_turn_stops_tts_worker_without_playing_remainder():
+    chat = VoiceChat()
+    cancel = threading.Event()
+
+    def fake_stream_speech(text, cancel=None):
+        for piece in (b"\x01\x00", b"\x02\x00", b"\x03\x00"):
+            if cancel is not None and cancel.is_set():
+                return
+            yield 22050, piece
+            time.sleep(0.05)
+
+    sounddevice = FakeSoundDevice()
+    chat._sounddevice = sounddevice
+    chat.stream_speech = fake_stream_speech  # type: ignore[method-assign]
+    chat.use_audio = True
+
+    try:
+        pipeline = chat._start_tts_pipeline(time.perf_counter(), cancel)
+        pipeline.sentences.put("one.")
+        pipeline.sentences.put("two.")
+        time.sleep(0.08)
+        chat._cancel_turn(cancel, pipeline)
+        pipeline.thread.join(timeout=2)
+        assert not pipeline.thread.is_alive()
+        total_chunks = sum(len(s.chunks) for s in sounddevice.output_streams)
+        # Would be 6 chunks if both sentences fully played; cancel cuts that short.
+        assert total_chunks < 6
+    finally:
+        chat.close()
 
 
 class FakeInputStream:

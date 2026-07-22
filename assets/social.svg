@@ -23,7 +23,7 @@
   <circle cx="100" cy="88" r="8" fill="#ff5f56"/>
   <circle cx="128" cy="88" r="8" fill="#ffbd2e"/>
   <circle cx="156" cy="88" r="8" fill="#27c93f"/>
-  <text x="640" y="94" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">voicebox 0.2.8 - localhost:8790</text>
+  <text x="640" y="94" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">voicebox 0.2.9 - localhost:8790</text>
 
   <text x="110" y="220" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="22">$</text>
   <text x="140" y="220" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="22">curl localhost:8790/v1/models</text>
@@ -39,5 +39,5 @@
   <text x="1170" y="320" text-anchor="end" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">* models_loaded</text>
   <text x="1170" y="360" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">faster-whisper | piper | kokoro</text>
   <text x="1170" y="400" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">speed | verbose_json | voices</text>
-  <text x="1170" y="440" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">CPU-first | fully local</text>
+  <text x="1170" y="440" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">CPU default | CUDA optional</text>
 </svg>

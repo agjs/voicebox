@@ -15,7 +15,7 @@ Key features:
 - **Turn-taking loop**: record until silence (VAD), send to STT, stream from LLM, synthesize and play responses incrementally
 - **Reasoning stripping**: removes `<think>...</think>` blocks from models like DeepSeek so they're never spoken
 - **Sentence chunking**: parses streamed LLM output and emits complete sentences as they're detected (`.?!` or newline), so TTS can start while the LLM is still generating
-- **Multiple modes**: interactive mic mode, `--text` for direct text input, `--file` for WAV file transcription
+- **Multiple modes**: interactive mic mode (optional `--barge-in`), `--text` for direct text input, `--file` for WAV file transcription
 - **Graceful degradation**: audio libraries are optional (lazy-imported) so `--text --no-audio` and tests work without audio dependencies
 
 ## Installation
@@ -153,12 +153,21 @@ No network or audio required.
 
 ## Barge-In (Interrupt on Speech)
 
-Currently **not implemented** (flag reserved for future). Implementing barge-in robustly requires:
-1. Lightweight parallel mic monitor while audio is playing
-2. Quick stop of playback and cancellation of any in-flight TTS
-3. Risk of false-positive interrupts from background noise or echo
+Opt-in for interactive mic mode only (not `--text` / `--file`):
 
-If you need barge-in, a `--barge-in` flag can be added to enable a parallel VAD monitor. For now, press `Ctrl-C` to interrupt and start a new turn.
+```bash
+python clients/voice-chat/voice_chat.py --barge-in
+```
+
+While the assistant is speaking (LLM + TTS + playback), a parallel VAD monitor
+listens on the mic. After ~200 ms of cumulative voiced frames, playback aborts,
+TTS/LLM streams cancel, partial assistant text stays in history, and the loop
+returns to the next listen turn. `Ctrl-C` uses the same cancel/abort path.
+
+**Headphones required.** There is no acoustic echo cancellation in this release.
+Open speakers will often self-interrupt when the TTS output reaches the mic.
+Raising `VOICEBOX_VAD_AGGRESSIVENESS` only reduces noise false positives; it does
+not replace AEC.
 
 ## Latency & Performance
 
@@ -169,8 +178,9 @@ Expected latency (turn-taking mode):
 - **TTS streaming**: begins immediately as sentences arrive; the server declares the PCM rate
 
 Sentences are synthesized in parallel with LLM generation and written to a single
-queued output stream. Playback is gapless, later sentences cannot interrupt earlier
-ones, and the microphone does not reopen until playback finishes.
+queued output stream. Playback is gapless. Without `--barge-in`, later sentences
+cannot interrupt earlier ones, and the microphone does not reopen until playback
+finishes. With `--barge-in`, speaking can abort the turn mid-playback (headphones).
 
 ## Error Handling
 

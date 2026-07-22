@@ -12,7 +12,7 @@ voice with no glue code.
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT license"/></a>
   <a href="https://github.com/agjs/voicebox/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/agjs/voicebox/test.yml?style=flat-square&label=CI" alt="CI"/></a>
-  <img src="https://img.shields.io/badge/version-0.2.8-blue?style=flat-square" alt="version 0.2.8"/>
+  <img src="https://img.shields.io/badge/version-0.2.9-blue?style=flat-square" alt="version 0.2.9"/>
   <a href="https://github.com/agjs/voicebox/pkgs/container/voicebox"><img src="https://img.shields.io/badge/ghcr.io-agjs%2Fvoicebox-blue?style=flat-square" alt="GHCR"/></a>
   <img src="https://img.shields.io/badge/python-3.11-blue?style=flat-square" alt="Python 3.11"/>
 </p>
@@ -87,10 +87,11 @@ In Admin, open Settings then Audio:
 ### Included clients (`clients/`)
 
 `clients/voice-chat/` is a turn-taking CLI with 30 ms VAD, streamed LLM output,
-background Piper synthesis, and gapless queued playback. `clients/claude-code/`
-has a Stop hook that synthesizes the first sentence before the remainder, plus a
-push-to-talk dictation helper. Both read
-`VOICEBOX_URL` (voice-chat also takes your LLM endpoint).
+background Piper synthesis, and gapless queued playback. Optional `--barge-in`
+lets you interrupt playback by speaking (headphones required; no AEC).
+`clients/claude-code/` has a Stop hook that synthesizes the first sentence before
+the remainder, plus a push-to-talk dictation helper. Both read `VOICEBOX_URL`
+(voice-chat also takes your LLM endpoint).
 
 ## Voices
 
@@ -152,7 +153,7 @@ Everything is set with environment variables (see `.env.example`):
 | `VOICEBOX_STT_HOTWORDS` | empty | Comma-separated project names and vocabulary hints |
 | `VOICEBOX_TTS_MODEL` | `speaches-ai/Kokoro-82M-v1.0-ONNX` | Kokoro model (when engine is kokoro) |
 | `VOICEBOX_DEFAULT_VOICE` | `af_heart` | Kokoro default voice |
-| `VOICEBOX_DEVICE` | `cpu` | `cpu` or `cuda` |
+| `VOICEBOX_DEVICE` | `cpu` | `cpu` or `cuda` (CUDA needs the optional GPU image; see below) |
 | `VOICEBOX_CPU_THREADS` | `4` | CTranslate2 CPU threads for STT. Match physical cores / `VOICEBOX_CPUS`. Compose also sets `OMP_NUM_THREADS` and `MKL_NUM_THREADS` from this value to avoid OpenMP oversubscription (more threads than CPUs often hurts latency). Bare-metal runs should export the same OpenMP/MKL vars before starting the process. |
 | `VOICEBOX_API_KEY` | empty | Optional bearer token protecting audio endpoints |
 | `VOICEBOX_BIND_ADDRESS` | `127.0.0.1` | Host interface published by Docker Compose |
@@ -176,11 +177,23 @@ four-CPU container quota. Cap OpenMP/MKL to that same thread count (Compose wire
 `OMP_NUM_THREADS` / `MKL_NUM_THREADS` from `VOICEBOX_CPU_THREADS`); oversubscribing
 threads past the cgroup CPU limit usually adds latency rather than removing it.
 If latency varies under load, give voicebox priority over heavier background
-services and watch for sustained frequency drops. A future CUDA node can use
-`VOICEBOX_DEVICE=cuda`; the CPU-oriented Piper path remains the default. The
-supplied image is CPU-only: a future GPU deployment also needs a CUDA/cuDNN
-runtime image (or a host installation with those libraries), not only the
-environment-variable change.
+services and watch for sustained frequency drops.
+
+### Optional CUDA image (STT GPU)
+
+Default path stays CPU: `Dockerfile`, `docker compose up`, and GHCR tags without a
+suffix are unchanged. For GPU STT (faster-whisper float16; Piper/Kokoro TTS still
+CPU), use the optional image:
+
+```bash
+docker compose --profile cuda up -d --build   # needs NVIDIA Container Toolkit
+# or pull a release tag: ghcr.io/agjs/voicebox:0.2.9-cuda
+```
+
+`-cuda` tags publish on version tags (`v*`) and manual `workflow_dispatch` only,
+not on every `main` push. CI validates compose config; it does **not** run GPU
+inference. Treat the first real NVIDIA host as the validation gate —
+ctranslate2/cuDNN mismatches are a known risk until then.
 
 ## Development
 
