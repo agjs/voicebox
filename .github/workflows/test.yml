@@ -28,3 +28,4 @@ jobs:
         run: |
           bash -n clients/claude-code/speak.sh
           docker compose config -q
+          docker compose --profile cuda config -q

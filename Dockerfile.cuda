@@ -1,0 +1,46 @@
+# Optional GPU image for STT (faster-whisper / CTranslate2). TTS stays on CPU.
+# CPU default image remains Dockerfile. Validate on a real NVIDIA host; CI does not
+# run GPU inference.
+FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV HF_HOME=/models/huggingface
+ENV OMP_NUM_THREADS=4
+ENV MKL_NUM_THREADS=4
+ENV VOICEBOX_DEVICE=cuda
+ENV VOICEBOX_PORT=8790
+
+# Ubuntu 22.04 ships Python 3.10; voicebox requires 3.11.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    python3.11-dev \
+    ffmpeg \
+    espeak-ng \
+    espeak \
+    curl \
+    && ln -sf /usr/bin/python3.11 /usr/local/bin/python \
+    && ln -sf /usr/bin/python3.11 /usr/local/bin/python3 \
+    && python3.11 -m ensurepip --upgrade \
+    && python3.11 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --system voicebox && useradd --system --gid voicebox --home-dir /app voicebox \
+    && mkdir -p "$HF_HOME" && chown -R voicebox:voicebox /models
+
+WORKDIR /app
+COPY pyproject.toml ./
+COPY src ./src
+RUN python -m pip install --no-cache-dir --disable-pip-version-check -e .
+
+COPY scripts/fetch_models.py ./scripts/fetch_models.py
+USER voicebox
+RUN python scripts/fetch_models.py
+
+ENV HF_HUB_OFFLINE=1
+
+EXPOSE 8790
+CMD ["python", "-m", "voicebox"]

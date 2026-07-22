@@ -42,7 +42,7 @@ def _locked_pcm_chunks(lock: threading.Lock, iterator):
 
 
 def create_app(stt, tts, settings: Settings) -> FastAPI:
-    app = FastAPI(title="voicebox", version="0.2.8")
+    app = FastAPI(title="voicebox", version="0.2.9")
     # This CPU-oriented server favors predictable latency over throughput. Keeping
     # one model inference active prevents STT and TTS from fighting for the same cores.
     inference_lock = threading.Lock()

@@ -24,7 +24,7 @@
   <circle cx="76" cy="56" r="6" fill="#ff5f56"/>
   <circle cx="98" cy="56" r="6" fill="#ffbd2e"/>
   <circle cx="120" cy="56" r="6" fill="#27c93f"/>
-  <text x="600" y="61" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="13">voicebox 0.2.8 - localhost:8790</text>
+  <text x="600" y="61" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="13">voicebox 0.2.9 - localhost:8790</text>
 
   <!-- Prompt line -->
   <text x="80" y="120" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">$</text>
@@ -55,5 +55,5 @@
   <text x="1080" y="200" text-anchor="end" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">* models_loaded</text>
   <text x="1080" y="226" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">faster-whisper | piper</text>
   <text x="1080" y="252" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">speed | verbose_json</text>
-  <text x="1080" y="278" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">CPU-first | Docker</text>
+  <text x="1080" y="278" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">CPU default | CUDA optional</text>
 </svg>
