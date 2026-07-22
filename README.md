@@ -82,7 +82,7 @@ In Admin, open Settings then Audio:
 | STT API Key | `sk-none`, or your `VOICEBOX_API_KEY` when authentication is enabled |
 | Text-to-Speech Engine | `OpenAI` |
 | TTS API Base URL | `http://<host>:8790/v1` |
-| TTS Voice | `af_heart` (ignored by Piper, used by Kokoro) |
+| TTS Voice | `af_heart` (Kokoro) or a baked Piper id such as `en_US-amy-medium` |
 
 ### Included clients (`clients/`)
 
@@ -123,8 +123,9 @@ them, such as `af_bella` and `bf_emma`) but is slower on CPU. Switch to it with
 
 | Endpoint | Description |
 |---|---|
-| `POST /v1/audio/transcriptions` | Multipart `file` (any common audio format), `language`, and `response_format=json\|text`. |
-| `POST /v1/audio/speech` | JSON `{input, voice?, response_format?}`. `wav` is complete; `pcm` is streamed 16-bit mono and declares its format in `X-Audio-*` headers. |
+| `GET /v1/models` | Lists the STT model id and available TTS voice ids for the active engine. |
+| `POST /v1/audio/transcriptions` | Multipart `file` (any common audio format), `language`, and `response_format=json\|text\|verbose_json`. `verbose_json` includes segment timestamps. |
+| `POST /v1/audio/speech` | JSON `{input, voice?, speed?, response_format?}`. `speed` is 0.25-4.0 (default 1.0). Piper `voice` must be one of the baked voices (`en_US-amy-medium`, `en_US-bryce-medium`, `en_US-lessac-medium`). `wav` is complete; `pcm` is streamed 16-bit mono and declares its format in `X-Audio-*` headers. |
 | `GET /health` | Returns `{"status":"ok","models_loaded":true}`. |
 
 The shapes match OpenAI's audio API, so existing SDKs and clients work unmodified.

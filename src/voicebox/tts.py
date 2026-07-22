@@ -37,13 +37,21 @@ class TtsEngine:
                 f"Original error: {exc}"
             ) from exc
 
-    def synthesize_stream(self, text: str, voice: str | None = None) -> Iterator[bytes]:
+    def list_voice_ids(self) -> list[str]:
+        return [self.default_voice]
+
+    def sample_rate_for(self, voice: str | None = None) -> int:
+        return self.sample_rate
+
+    def synthesize_stream(
+        self, text: str, voice: str | None = None, speed: float = 1.0
+    ) -> Iterator[bytes]:
         sentences = split_sentences(text)
         if not sentences:
             raise ValueError("input text is empty")
         v = voice or self.default_voice
         for sentence in sentences:
-            samples, _sr = self.kokoro.create(sentence, voice=v, speed=1.0)
+            samples, _sr = self.kokoro.create(sentence, voice=v, speed=speed)
             pcm = np.clip(samples, -1.0, 1.0)
             pcm16 = (pcm * 32767.0).astype("<i2")
             yield pcm16.tobytes()

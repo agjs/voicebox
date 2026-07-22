@@ -3,7 +3,7 @@
 from faster_whisper import WhisperModel
 from huggingface_hub import hf_hub_download
 from voicebox.config import load_settings
-from voicebox.tts_piper import piper_voice_relpaths
+from voicebox.tts_piper import BAKED_PIPER_VOICES, piper_voice_relpaths
 
 s = load_settings()
 
@@ -21,9 +21,8 @@ print("Downloading TTS model files...")
 hf_hub_download(s.tts_model, "model.onnx", revision=s.tts_model_revision)
 hf_hub_download(s.tts_model, "voices.bin", revision=s.tts_model_revision)
 
-# TTS (Piper): bake the configured voice plus a couple of good medium voices so
-# they can be selected at runtime (VOICEBOX_PIPER_VOICE) with no rebuild.
-_piper_voices = {s.piper_voice, "en_US-amy-medium", "en_US-bryce-medium", "en_US-lessac-medium"}
+# TTS (Piper): bake the configured voice plus the runtime-swappable set.
+_piper_voices = set(BAKED_PIPER_VOICES) | {s.piper_voice}
 for _voice in sorted(_piper_voices):
     print(f"Downloading Piper voice {_voice}...")
     _onnx_rel, _json_rel = piper_voice_relpaths(_voice)

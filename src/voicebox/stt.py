@@ -1,6 +1,7 @@
 from __future__ import annotations
 import io
 import gc
+from dataclasses import dataclass
 
 import av
 import numpy as np
@@ -14,6 +15,22 @@ class AudioDecodeError(ValueError):
 
 class AudioTooLongError(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class TranscriptionSegment:
+    id: int
+    start: float
+    end: float
+    text: str
+
+
+@dataclass(frozen=True)
+class TranscriptionResult:
+    text: str
+    language: str | None = None
+    duration: float | None = None
+    segments: tuple[TranscriptionSegment, ...] = ()
 
 
 def _decode_audio_limited(audio: bytes, max_seconds: int, sampling_rate: int = 16000) -> np.ndarray:
@@ -61,6 +78,7 @@ def _decode_audio_limited(audio: bytes, max_seconds: int, sampling_rate: int = 1
 
 class SttEngine:
     def __init__(self, settings: Settings) -> None:
+        self.model_id = settings.stt_model
         self.max_audio_seconds = settings.max_audio_seconds
         self.beam_size = settings.stt_beam_size
         self.vad_filter = settings.stt_vad_filter
@@ -82,7 +100,9 @@ class SttEngine:
                 f"Original error: {exc}"
             ) from exc
 
-    def transcribe(self, audio: bytes, language: str = "en") -> str:
+    def transcribe(
+        self, audio: bytes, language: str = "en", *, timestamps: bool = False
+    ) -> TranscriptionResult:
         # Validate language before decoding so an unsupported language fails fast
         # without spending CPU on audio decode.
         if language not in self.model.supported_languages:
@@ -92,20 +112,40 @@ class SttEngine:
             )
         try:
             decoded = _decode_audio_limited(audio, self.max_audio_seconds)
-            segments, _info = self.model.transcribe(
+            segments_iter, info = self.model.transcribe(
                 decoded,
                 language=language,
                 beam_size=self.beam_size,
                 condition_on_previous_text=False,
-                without_timestamps=True,
+                without_timestamps=not timestamps,
                 vad_filter=self.vad_filter,
                 vad_parameters=self.vad_parameters if self.vad_filter else None,
                 hotwords=self.hotwords,
             )
-            parts = [seg.text for seg in segments]
+            raw_segments = list(segments_iter)
         except (AudioDecodeError, AudioTooLongError):
             raise
         except Exception as exc:  # PyAV/CT2 decode failures
             raise AudioDecodeError(str(exc)) from exc
-        text = "".join(parts).strip()
-        return text
+
+        text = "".join(seg.text for seg in raw_segments).strip()
+        if not timestamps:
+            return TranscriptionResult(text=text, language=language)
+
+        segments = tuple(
+            TranscriptionSegment(
+                id=index,
+                start=float(seg.start),
+                end=float(seg.end),
+                text=seg.text,
+            )
+            for index, seg in enumerate(raw_segments)
+        )
+        duration = getattr(info, "duration", None)
+        detected = getattr(info, "language", None) or language
+        return TranscriptionResult(
+            text=text,
+            language=detected,
+            duration=float(duration) if duration is not None else None,
+            segments=segments,
+        )
