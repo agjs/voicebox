@@ -1,6 +1,10 @@
 FROM python:3.11-slim
 
 ENV HF_HOME=/models/huggingface
+# Cap OpenMP/MKL to the default container CPU quota before native libs load.
+# Override at runtime via compose (OMP_NUM_THREADS/MKL_NUM_THREADS from VOICEBOX_CPU_THREADS).
+ENV OMP_NUM_THREADS=4
+ENV MKL_NUM_THREADS=4
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg espeak-ng espeak curl && rm -rf /var/lib/apt/lists/*

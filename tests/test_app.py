@@ -146,6 +146,32 @@ def test_speech_pcm_declares_audio_format(client):
     assert r.headers["x-audio-sample-format"] == "s16le"
 
 
+def test_pcm_releases_inference_lock_between_chunks():
+    """After the first PCM chunk is yielded, the inference lock must be free.
+
+    Proves a slow reader cannot hold the lock across the client drain gap.
+    Uses non-blocking acquire (no sleeps / timing races).
+    """
+    import threading
+
+    from voicebox.app import _locked_pcm_chunks
+
+    lock = threading.Lock()
+
+    def two_chunks():
+        yield b"\x01\x00" * 100
+        yield b"\x02\x00" * 100
+
+    stream = _locked_pcm_chunks(lock, two_chunks())
+    first = next(stream)
+    assert first == b"\x01\x00" * 100
+    assert lock.acquire(blocking=False), "lock still held after first PCM chunk"
+    lock.release()
+    assert next(stream) == b"\x02\x00" * 100
+    assert lock.acquire(blocking=False)
+    lock.release()
+
+
 def test_speech_honors_speed_and_voice():
     tts = FakeTts()
     client = TestClient(create_app(FakeStt(), tts, load_settings()))

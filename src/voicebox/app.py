@@ -30,11 +30,23 @@ def _parse_speed(raw) -> float:
     return speed
 
 
+def _locked_pcm_chunks(lock: threading.Lock, iterator):
+    """Yield PCM chunks, holding lock only while synthesizing each chunk."""
+    while True:
+        with lock:
+            try:
+                chunk = next(iterator)
+            except StopIteration:
+                return
+        yield chunk
+
+
 def create_app(stt, tts, settings: Settings) -> FastAPI:
-    app = FastAPI(title="voicebox", version="0.2.7")
+    app = FastAPI(title="voicebox", version="0.2.8")
     # This CPU-oriented server favors predictable latency over throughput. Keeping
     # one model inference active prevents STT and TTS from fighting for the same cores.
     inference_lock = threading.Lock()
+    app.state.inference_lock = inference_lock
 
     @app.middleware("http")
     async def authenticate(request: Request, call_next):
@@ -168,13 +180,8 @@ def create_app(stt, tts, settings: Settings) -> FastAPI:
                 headers={"Server-Timing": f"tts;dur={duration_ms:.1f}"},
             )
 
-        # pcm: raw int16 stream for low-latency clients that play as bytes arrive.
-        def gen():
-            with inference_lock:
-                yield from tts.synthesize_stream(text, voice, speed)
-
         return StreamingResponse(
-            gen(),
+            _locked_pcm_chunks(inference_lock, tts.synthesize_stream(text, voice, speed)),
             media_type="audio/pcm",
             headers={
                 "X-Audio-Sample-Rate": str(sample_rate),

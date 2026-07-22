@@ -18,4 +18,4 @@ Type "bash ./assets/demo.sh"
 Enter
 Sleep 400ms
 Show
-Sleep 12s
+Sleep 14s
