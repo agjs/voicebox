@@ -1,16 +1,35 @@
+<p align="center">
+  <img src="assets/banner.svg" alt="voicebox - self-hosted OpenAI-compatible speech server" width="900"/>
+</p>
+
 # voicebox
 
-A tiny, self-hosted, OpenAI-compatible speech server. It does speech-to-text
-(`faster-whisper`) and text-to-speech (`Piper` or `Kokoro`) behind the same HTTP
-API as OpenAI's audio endpoints, so anything that already speaks that API (Open
-WebUI, your own agents, CLIs, coding assistants) gets a local voice with no glue
-code.
+Self-hosted, OpenAI-compatible speech server. Speech-to-text (`faster-whisper`)
+and text-to-speech (`Piper` or `Kokoro`) behind the same HTTP API as OpenAI's
+audio endpoints, so Open WebUI, agents, CLIs, and coding assistants get a local
+voice with no glue code.
 
-- Talk to your local models. One backend, many clients.
-- Fully local and private. No cloud or required API keys; nothing leaves your box.
-- Fast on plain CPUs. Runs real-time on a mini PC or an old quad-core, no GPU required (it uses one if you have it).
-- Drop-in OpenAI audio API: `/v1/audio/transcriptions` and `/v1/audio/speech`.
-- Swappable voices and engines via env vars, no rebuild.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT license"/></a>
+  <a href="https://github.com/agjs/voicebox/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/agjs/voicebox/test.yml?style=flat-square&label=CI" alt="CI"/></a>
+  <img src="https://img.shields.io/badge/version-0.2.6-blue?style=flat-square" alt="version 0.2.6"/>
+  <a href="https://github.com/agjs/voicebox/pkgs/container/voicebox"><img src="https://img.shields.io/badge/ghcr.io-agjs%2Fvoicebox-blue?style=flat-square" alt="GHCR"/></a>
+  <img src="https://img.shields.io/badge/python-3.11-blue?style=flat-square" alt="Python 3.11"/>
+</p>
+
+<p align="center">
+  <img src="assets/demo.gif" alt="Demo: health check, TTS, and STT round-trip via curl" width="780"/>
+</p>
+
+<p align="center"><sub>Regenerate the demo GIF with <code>vhs assets/demo.tape</code> (no live server required).</sub></p>
+
+## Why this
+
+- **Fully local.** No cloud calls and no required API keys; audio stays on your machine.
+- **OpenAI drop-in.** Point clients at `http://<host>:8790/v1` for `/v1/audio/transcriptions` and `/v1/audio/speech`.
+- **CPU-fast by default.** Piper TTS runs roughly 14x faster than real-time on a plain quad-core; STT uses distil-whisper int8.
+- **One Docker command.** Models bake into the image; `docker compose up` is enough.
+- **Works with your stack.** Open WebUI, included voice-chat / Claude Code clients, or any OpenAI-audio SDK.
 
 ## Quick start
 
@@ -44,7 +63,7 @@ curl -fsS localhost:8790/v1/audio/transcriptions \
 
 Point any OpenAI-audio-compatible client at `http://<host>:8790/v1` and you are done.
 
-For LAN access, set `VOICEBOX_BIND_ADDRESS` to the Lenovo's private IP (or
+For LAN access, set `VOICEBOX_BIND_ADDRESS` to a private IP on the host (or
 `0.0.0.0` when a firewall controls access). Set `VOICEBOX_API_KEY` as well; clients
 can send it as an OpenAI-style bearer token. The health endpoint intentionally
 remains unauthenticated for container probes.
@@ -132,7 +151,7 @@ Everything is set with environment variables (see `.env.example`):
 | `VOICEBOX_TTS_MODEL` | `speaches-ai/Kokoro-82M-v1.0-ONNX` | Kokoro model (when engine is kokoro) |
 | `VOICEBOX_DEFAULT_VOICE` | `af_heart` | Kokoro default voice |
 | `VOICEBOX_DEVICE` | `cpu` | `cpu` or `cuda` |
-| `VOICEBOX_CPU_THREADS` | `4` | CTranslate2 CPU threads; matches the i7-6700T's physical cores |
+| `VOICEBOX_CPU_THREADS` | `4` | CTranslate2 CPU threads; match your physical cores / container quota |
 | `VOICEBOX_API_KEY` | empty | Optional bearer token protecting audio endpoints |
 | `VOICEBOX_BIND_ADDRESS` | `127.0.0.1` | Host interface published by Docker Compose |
 | `VOICEBOX_PORT` | `8790` | Listen port |
@@ -150,13 +169,13 @@ CPU-only, on one reference box (a 2015-era quad-core, no GPU):
 | TTS | Piper `amy-medium` | about 0.07x (roughly 14x faster than real-time) |
 | TTS | Kokoro-82M | about 0.5x |
 
-For the i7-6700T, keep Piper, int8 STT, four inference threads, and a four-CPU
-container quota. If latency varies under load, give voicebox priority over
-Prometheus/ClickHouse/Loki work and watch for sustained frequency drops. A future
-CUDA node can use `VOICEBOX_DEVICE=cuda`; the CPU-oriented Piper path remains the
-default. The supplied image is CPU-only: a future GPU deployment also needs a
-CUDA/cuDNN runtime image (or a host installation with those libraries), not only
-the environment-variable change.
+For that class of CPU, keep Piper, int8 STT, four inference threads, and a
+four-CPU container quota. If latency varies under load, give voicebox priority
+over heavier background services and watch for sustained frequency drops. A
+future CUDA node can use `VOICEBOX_DEVICE=cuda`; the CPU-oriented Piper path
+remains the default. The supplied image is CPU-only: a future GPU deployment
+also needs a CUDA/cuDNN runtime image (or a host installation with those
+libraries), not only the environment-variable change.
 
 ## Development
 

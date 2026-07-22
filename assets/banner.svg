@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-label="voicebox - self-hosted OpenAI-compatible speech server">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3fb950" stop-opacity="0.15"/>
+      <stop offset="50%" stop-color="#39d353" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#58a6ff" stop-opacity="0.35"/>
+    </linearGradient>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#21262d" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="420" fill="url(#bg)"/>
+  <rect width="1200" height="420" fill="url(#grid)" opacity="0.55"/>
+
+  <!-- Terminal chrome -->
+  <rect x="48" y="36" width="1104" height="348" rx="12" fill="#010409" stroke="#30363d" stroke-width="1.5"/>
+  <rect x="48" y="36" width="1104" height="40" rx="12" fill="#161b22"/>
+  <rect x="48" y="60" width="1104" height="16" fill="#161b22"/>
+  <circle cx="76" cy="56" r="6" fill="#ff5f56"/>
+  <circle cx="98" cy="56" r="6" fill="#ffbd2e"/>
+  <circle cx="120" cy="56" r="6" fill="#27c93f"/>
+  <text x="600" y="61" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="13">voicebox - localhost:8790</text>
+
+  <!-- Prompt line -->
+  <text x="80" y="120" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">$</text>
+  <text x="100" y="120" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">curl localhost:8790/v1/audio/speech</text>
+
+  <!-- Wordmark -->
+  <text x="80" y="210" fill="#f0f6fc" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="72" font-weight="700" letter-spacing="-2">voicebox</text>
+
+  <!-- Tagline -->
+  <text x="80" y="255" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20">self-hosted  |  OpenAI-compatible  |  STT + TTS</text>
+
+  <!-- Endpoint chips -->
+  <rect x="80" y="286" width="268" height="32" rx="6" fill="#21262d" stroke="#30363d"/>
+  <text x="96" y="307" fill="#58a6ff" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">/v1/audio/transcriptions</text>
+  <rect x="360" y="286" width="210" height="32" rx="6" fill="#21262d" stroke="#30363d"/>
+  <text x="376" y="307" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">/v1/audio/speech</text>
+  <rect x="582" y="286" width="96" height="32" rx="6" fill="#21262d" stroke="#30363d"/>
+  <text x="598" y="307" fill="#d29922" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">/health</text>
+
+  <!-- Waveform -->
+  <g transform="translate(80, 340)" stroke="url(#wave)" stroke-width="2.5" stroke-linecap="round" fill="none">
+    <path d="M0 12 L18 12 L26 2 L34 22 L42 6 L50 18 L58 8 L66 16 L74 4 L82 20 L90 10 L98 14 L106 3 L114 21 L122 9 L130 15 L138 5 L146 19 L154 11 L162 12 L180 12 L198 12 L206 4 L214 20 L222 8 L230 16 L238 2 L246 22 L254 10 L262 14 L270 6 L278 18 L286 12 L320 12 L338 12 L346 5 L354 19 L362 8 L370 16 L378 3 L386 21 L394 11 L410 12 L440 12"/>
+  </g>
+
+  <!-- Right-side status -->
+  <text x="1080" y="210" text-anchor="end" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">* models_loaded</text>
+  <text x="1080" y="236" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">faster-whisper | piper</text>
+  <text x="1080" y="262" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">CPU-first | Docker</text>
+</svg>
