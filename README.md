@@ -21,8 +21,6 @@ voice with no glue code.
   <img src="assets/demo.gif" alt="Demo: health check, TTS, and STT round-trip via curl" width="780"/>
 </p>
 
-<p align="center"><sub>Regenerate the demo GIF with <code>vhs assets/demo.tape</code> (no live server required).</sub></p>
-
 ## Why this
 
 - **Fully local.** No cloud calls and no required API keys; audio stays on your machine.
