@@ -6,6 +6,11 @@ from voicebox.config import Settings
 from voicebox.tts import split_sentences
 
 _PIPER_REPO = "rhasspy/piper-voices"
+BAKED_PIPER_VOICES = (
+    "en_US-amy-medium",
+    "en_US-bryce-medium",
+    "en_US-lessac-medium",
+)
 
 
 def piper_voice_relpaths(voice_name: str) -> tuple[str, str]:
@@ -24,49 +29,74 @@ class PiperTtsEngine:
     """Fast CPU TTS via Piper. Same interface as TtsEngine (Kokoro)."""
 
     def __init__(self, settings: Settings) -> None:
-        self.piper_voice_name = settings.piper_voice
-        onnx_rel, json_rel = piper_voice_relpaths(settings.piper_voice)
+        self.default_voice = settings.piper_voice
+        self._base_length_scale = settings.piper_length_scale
+        self._noise_scale = settings.piper_noise_scale
+        self._noise_w = settings.piper_noise_w
+        self._voices: dict = {}
+        self._sample_rates: dict[str, int] = {}
+        voice_names = set(BAKED_PIPER_VOICES) | {settings.piper_voice}
         try:
-            from piper import PiperVoice, SynthesisConfig
+            from piper import PiperVoice
 
-            # Resolve baked voice files from the HF cache (respects HF_HUB_OFFLINE=1).
-            voice_onnx = hf_hub_download(
-                repo_id=_PIPER_REPO,
-                filename=onnx_rel,
-                revision=settings.piper_model_revision,
-            )
-            voice_json = hf_hub_download(
-                repo_id=_PIPER_REPO,
-                filename=json_rel,
-                revision=settings.piper_model_revision,
-            )
-            self.piper_voice = PiperVoice.load(voice_onnx, config_path=voice_json)
-            # length_scale < 1.0 speaks faster; noise_scale/noise_w_scale are
-            # Piper's prosody knobs (defaults 0.667 / 0.8).
-            self._syn_config = SynthesisConfig(
-                length_scale=settings.piper_length_scale,
-                noise_scale=settings.piper_noise_scale,
-                noise_w_scale=settings.piper_noise_w,
-            )
-            with open(voice_json) as f:
-                cfg = json.load(f)
-            self.sample_rate = int(cfg.get("audio", {}).get("sample_rate", 22050))
+            for voice_name in sorted(voice_names):
+                onnx_rel, json_rel = piper_voice_relpaths(voice_name)
+                # Resolve baked voice files from the HF cache (respects HF_HUB_OFFLINE=1).
+                voice_onnx = hf_hub_download(
+                    repo_id=_PIPER_REPO,
+                    filename=onnx_rel,
+                    revision=settings.piper_model_revision,
+                )
+                voice_json = hf_hub_download(
+                    repo_id=_PIPER_REPO,
+                    filename=json_rel,
+                    revision=settings.piper_model_revision,
+                )
+                self._voices[voice_name] = PiperVoice.load(voice_onnx, config_path=voice_json)
+                with open(voice_json) as f:
+                    cfg = json.load(f)
+                self._sample_rates[voice_name] = int(cfg.get("audio", {}).get("sample_rate", 22050))
         except ImportError as exc:
             raise RuntimeError(
                 "piper-tts is not installed. Install with: pip install piper-tts"
             ) from exc
         except Exception as exc:
             raise RuntimeError(
-                f"Failed to load Piper voice '{settings.piper_voice}'. If offline, "
-                f"ensure the voice is baked into the image / present in the HF cache. "
+                f"Failed to load Piper voice(s) {sorted(voice_names)}. If offline, "
+                f"ensure the voices are baked into the image / present in the HF cache. "
                 f"Original error: {exc}"
             ) from exc
+        self.sample_rate = self._sample_rates[self.default_voice]
 
-    def synthesize_stream(self, text: str, voice: str | None = None) -> Iterator[bytes]:
+    def list_voice_ids(self) -> list[str]:
+        return sorted(self._voices)
+
+    def sample_rate_for(self, voice: str | None = None) -> int:
+        return self._sample_rates[self._resolve_voice(voice)]
+
+    def _resolve_voice(self, voice: str | None) -> str:
+        name = voice or self.default_voice
+        if name not in self._voices:
+            supported = ", ".join(self.list_voice_ids())
+            raise ValueError(f"unsupported voice {name!r}; supported: {supported}")
+        return name
+
+    def synthesize_stream(
+        self, text: str, voice: str | None = None, speed: float = 1.0
+    ) -> Iterator[bytes]:
+        from piper import SynthesisConfig
+
         sentences = split_sentences(text)
         if not sentences:
             raise ValueError("input text is empty")
+        voice_name = self._resolve_voice(voice)
+        piper_voice = self._voices[voice_name]
+        syn_config = SynthesisConfig(
+            length_scale=self._base_length_scale / speed,
+            noise_scale=self._noise_scale,
+            noise_w_scale=self._noise_w,
+        )
         # Forward Piper's int16-LE chunks immediately for true low-latency PCM playback.
         for sentence in sentences:
-            for chunk in self.piper_voice.synthesize(sentence, syn_config=self._syn_config):
+            for chunk in piper_voice.synthesize(sentence, syn_config=syn_config):
                 yield chunk.audio_int16_bytes

@@ -18,7 +18,7 @@ def engine():
 @pytest.mark.model
 def test_transcribes_known_audio(engine):
     with open("tests/fixtures/hello.wav", "rb") as f:
-        text = engine.transcribe(f.read())
+        text = engine.transcribe(f.read()).text
     lowered = text.lower()
     assert "hello world" in lowered
     # Whisper may transcribe "voicebox" as "voice box" (two words)
@@ -81,10 +81,44 @@ def test_transcription_uses_low_latency_options(monkeypatch, settings_factory):
     )
     settings = settings_factory(stt_beam_size=1, stt_hotwords="Voicebox, ClickHouse")
     engine = SttEngine(settings)
-    assert engine.transcribe(b"audio") == "hello"
+    assert engine.transcribe(b"audio").text == "hello"
     assert captured["init"]["cpu_threads"] == 4
     assert captured["init"]["revision"] == settings.stt_model_revision
     assert captured["transcribe"]["beam_size"] == 1
     assert captured["transcribe"]["condition_on_previous_text"] is False
     assert captured["transcribe"]["without_timestamps"] is True
     assert captured["transcribe"]["hotwords"] == "Voicebox, ClickHouse"
+
+
+def test_transcription_verbose_enables_timestamps(monkeypatch, settings_factory):
+    captured = {}
+
+    class FakeWhisperModel:
+        supported_languages = ["en"]
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def transcribe(self, audio, **kwargs):
+            captured["transcribe"] = kwargs
+            segments = [
+                SimpleNamespace(text=" hello", start=0.0, end=0.5),
+                SimpleNamespace(text=" world", start=0.5, end=1.0),
+            ]
+            info = SimpleNamespace(language="en", duration=1.0)
+            return iter(segments), info
+
+    monkeypatch.setattr("voicebox.stt.WhisperModel", FakeWhisperModel)
+    monkeypatch.setattr(
+        "voicebox.stt._decode_audio_limited",
+        lambda audio, max_seconds: np.zeros(1600, dtype=np.float32),
+    )
+    engine = SttEngine(settings_factory())
+    result = engine.transcribe(b"audio", timestamps=True)
+    assert captured["transcribe"]["without_timestamps"] is False
+    assert result.text == "hello world"
+    assert result.language == "en"
+    assert result.duration == 1.0
+    assert len(result.segments) == 2
+    assert result.segments[0].start == 0.0
+    assert result.segments[1].text == " world"
