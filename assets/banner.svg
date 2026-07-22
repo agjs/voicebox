@@ -24,11 +24,11 @@
   <circle cx="76" cy="56" r="6" fill="#ff5f56"/>
   <circle cx="98" cy="56" r="6" fill="#ffbd2e"/>
   <circle cx="120" cy="56" r="6" fill="#27c93f"/>
-  <text x="600" y="61" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="13">voicebox - localhost:8790</text>
+  <text x="600" y="61" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="13">voicebox 0.2.8 - localhost:8790</text>
 
   <!-- Prompt line -->
   <text x="80" y="120" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">$</text>
-  <text x="100" y="120" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">curl localhost:8790/v1/audio/speech</text>
+  <text x="100" y="120" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">curl localhost:8790/v1/models</text>
 
   <!-- Wordmark -->
   <text x="80" y="210" fill="#f0f6fc" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="72" font-weight="700" letter-spacing="-2">voicebox</text>
@@ -37,12 +37,14 @@
   <text x="80" y="255" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20">self-hosted  |  OpenAI-compatible  |  STT + TTS</text>
 
   <!-- Endpoint chips -->
-  <rect x="80" y="286" width="268" height="32" rx="6" fill="#21262d" stroke="#30363d"/>
-  <text x="96" y="307" fill="#58a6ff" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">/v1/audio/transcriptions</text>
-  <rect x="360" y="286" width="210" height="32" rx="6" fill="#21262d" stroke="#30363d"/>
-  <text x="376" y="307" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">/v1/audio/speech</text>
-  <rect x="582" y="286" width="96" height="32" rx="6" fill="#21262d" stroke="#30363d"/>
-  <text x="598" y="307" fill="#d29922" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">/health</text>
+  <rect x="80" y="286" width="118" height="32" rx="6" fill="#21262d" stroke="#30363d"/>
+  <text x="96" y="307" fill="#d29922" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">/v1/models</text>
+  <rect x="210" y="286" width="268" height="32" rx="6" fill="#21262d" stroke="#30363d"/>
+  <text x="226" y="307" fill="#58a6ff" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">/v1/audio/transcriptions</text>
+  <rect x="490" y="286" width="210" height="32" rx="6" fill="#21262d" stroke="#30363d"/>
+  <text x="506" y="307" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">/v1/audio/speech</text>
+  <rect x="712" y="286" width="96" height="32" rx="6" fill="#21262d" stroke="#30363d"/>
+  <text x="728" y="307" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">/health</text>
 
   <!-- Waveform -->
   <g transform="translate(80, 340)" stroke="url(#wave)" stroke-width="2.5" stroke-linecap="round" fill="none">
@@ -50,7 +52,8 @@
   </g>
 
   <!-- Right-side status -->
-  <text x="1080" y="210" text-anchor="end" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">* models_loaded</text>
-  <text x="1080" y="236" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">faster-whisper | piper</text>
-  <text x="1080" y="262" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">CPU-first | Docker</text>
+  <text x="1080" y="200" text-anchor="end" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">* models_loaded</text>
+  <text x="1080" y="226" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">faster-whisper | piper</text>
+  <text x="1080" y="252" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">speed | verbose_json</text>
+  <text x="1080" y="278" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">CPU-first | Docker</text>
 </svg>

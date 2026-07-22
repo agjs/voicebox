@@ -1,6 +1,5 @@
 from __future__ import annotations
 import io
-import gc
 from dataclasses import dataclass
 
 import av
@@ -68,7 +67,6 @@ def _decode_audio_limited(audio: bytes, max_seconds: int, sampling_rate: int = 1
         raise AudioDecodeError(str(exc)) from exc
     finally:
         del resampler
-        gc.collect()
 
     if not chunks:
         raise AudioDecodeError("no audio decoded")

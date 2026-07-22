@@ -9,38 +9,49 @@ echo "tts -> /tmp/vb_smoke.wav"
   --output /tmp/vb_smoke.wav \
   -d '{"model":"m","input":"Hello from voicebox. Streaming works.","response_format":"wav"}'
 
-# Validate raw streaming WAV (no reconstruction)
+# Validate a complete WAV (real RIFF/data sizes; sample rate from header).
 python3 << 'EOF'
 import struct
-import os
 
-def validate_streaming_wav(filename: str) -> float:
-    """Validate raw streaming WAV with placeholder header sizes.
-
-    The WAV header contains 0xFFFFFFFF placeholders for RIFF and data sizes,
-    which is standard for streaming WAV. Compute duration from actual file size.
-    Returns: duration in seconds
-    """
-    with open(filename, 'rb') as f:
+def validate_complete_wav(filename: str) -> float:
+    with open(filename, "rb") as f:
         data = f.read()
 
-    # Validate WAV header structure
     assert len(data) >= 44, f"WAV too short: {len(data)} bytes"
     assert data[0:4] == b"RIFF", f"Invalid RIFF magic: {data[0:4]}"
     assert data[8:12] == b"WAVE", f"Invalid WAVE magic: {data[8:12]}"
 
-    # Compute duration from actual file size (44-byte header + PCM data)
-    # 24 kHz sample rate, 16-bit (2 bytes) mono
-    pcm_bytes = len(data) - 44
-    sample_rate = 24000
-    bytes_per_sample = 2  # 16-bit
-    duration = pcm_bytes / (sample_rate * bytes_per_sample)
+    # RIFF size at offset 4 is file_size - 8 for a complete WAV.
+    riff_size = struct.unpack_from("<I", data, 4)[0]
+    assert riff_size == len(data) - 8, f"RIFF size {riff_size} != {len(data) - 8}"
 
+    # Walk chunks to find fmt and data (header may include extra chunks).
+    offset = 12
+    sample_rate = None
+    channels = None
+    bits = None
+    data_size = None
+    while offset + 8 <= len(data):
+        chunk_id = data[offset : offset + 4]
+        chunk_size = struct.unpack_from("<I", data, offset + 4)[0]
+        payload = offset + 8
+        if chunk_id == b"fmt ":
+            channels = struct.unpack_from("<H", data, payload + 2)[0]
+            sample_rate = struct.unpack_from("<I", data, payload + 4)[0]
+            bits = struct.unpack_from("<H", data, payload + 14)[0]
+        elif chunk_id == b"data":
+            data_size = chunk_size
+            break
+        offset = payload + chunk_size + (chunk_size % 2)
+
+    assert sample_rate and channels and bits and data_size is not None, "missing fmt/data"
+    bytes_per_sample = bits // 8
+    duration = data_size / (sample_rate * channels * bytes_per_sample)
     assert duration > 1.0, f"Duration too short: {duration:.2f}s (expected > 1.0s)"
-    print(f"wav ok {duration:.2f}s")
+    print(f"wav ok {duration:.2f}s @ {sample_rate} Hz")
     return duration
 
-validate_streaming_wav('/tmp/vb_smoke.wav')
+validate_complete_wav("/tmp/vb_smoke.wav")
 EOF
 
 echo "stt round-trip:"

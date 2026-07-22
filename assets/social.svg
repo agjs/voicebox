@@ -23,20 +23,21 @@
   <circle cx="100" cy="88" r="8" fill="#ff5f56"/>
   <circle cx="128" cy="88" r="8" fill="#ffbd2e"/>
   <circle cx="156" cy="88" r="8" fill="#27c93f"/>
-  <text x="640" y="94" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">voicebox - localhost:8790</text>
+  <text x="640" y="94" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">voicebox 0.2.8 - localhost:8790</text>
 
   <text x="110" y="220" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="22">$</text>
-  <text x="140" y="220" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="22">docker compose up -d</text>
+  <text x="140" y="220" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="22">curl localhost:8790/v1/models</text>
 
-  <text x="110" y="340" fill="#f0f6fc" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="96" font-weight="700" letter-spacing="-3">voicebox</text>
-  <text x="110" y="400" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="28">self-hosted OpenAI-compatible speech server</text>
-  <text x="110" y="450" fill="#58a6ff" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="22">/v1/audio/transcriptions  |  /v1/audio/speech</text>
+  <text x="110" y="330" fill="#f0f6fc" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="96" font-weight="700" letter-spacing="-3">voicebox</text>
+  <text x="110" y="390" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="28">self-hosted OpenAI-compatible speech server</text>
+  <text x="110" y="440" fill="#58a6ff" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="22">/v1/models  |  /v1/audio/transcriptions  |  /v1/audio/speech</text>
 
   <g transform="translate(110, 500)" stroke="url(#wave)" stroke-width="3" stroke-linecap="round" fill="none">
     <path d="M0 16 L24 16 L36 2 L48 30 L60 8 L72 24 L84 6 L96 28 L108 10 L120 22 L132 4 L144 26 L156 14 L180 16 L210 16 L222 4 L234 28 L246 10 L258 22 L270 2 L282 30 L294 12 L320 16 L360 16 L372 6 L384 26 L396 10 L420 16 L480 16"/>
   </g>
 
-  <text x="1170" y="340" text-anchor="end" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">* models_loaded</text>
-  <text x="1170" y="380" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">faster-whisper | piper | kokoro</text>
-  <text x="1170" y="420" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">CPU-first | fully local</text>
+  <text x="1170" y="320" text-anchor="end" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">* models_loaded</text>
+  <text x="1170" y="360" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">faster-whisper | piper | kokoro</text>
+  <text x="1170" y="400" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">speed | verbose_json | voices</text>
+  <text x="1170" y="440" text-anchor="end" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">CPU-first | fully local</text>
 </svg>
