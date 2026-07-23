@@ -86,12 +86,30 @@ In Admin, open Settings then Audio:
 
 ### Included clients (`clients/`)
 
-`clients/voice-chat/` is a turn-taking CLI with 30 ms VAD, streamed LLM output,
-background Piper synthesis, and gapless queued playback. Optional `--barge-in`
-lets you interrupt playback by speaking (headphones required; no AEC).
+#### Voice chat CLI
+
+Turn-taking mic conversation against voicebox STT/TTS and any OpenAI-compatible
+LLM. Optional `--barge-in` interrupts playback when you speak (headphones
+required; no AEC). This is a long-running session you start when you want voice
+(Ctrl-C to exit) — it does not attach inside Cursor/Claude/etc.
+
+```bash
+# Install once (client-only deps; does not install the speech server)
+uv tool install "git+https://github.com/agjs/voicebox.git#subdirectory=clients/voice-chat"
+# or: pip install "git+https://github.com/agjs/voicebox.git#subdirectory=clients/voice-chat"
+
+export VOICEBOX_URL=http://localhost:8790
+export VOICEBOX_LLM_URL=http://localhost:8000/v1/chat/completions
+export VOICEBOX_LLM_MODEL=local-model
+voicebox-chat --barge-in
+```
+
+More detail: [`clients/voice-chat/README.md`](clients/voice-chat/README.md).
+
+#### Claude Code helpers
+
 `clients/claude-code/` has a Stop hook that synthesizes the first sentence before
-the remainder, plus a push-to-talk dictation helper. Both read `VOICEBOX_URL`
-(voice-chat also takes your LLM endpoint).
+the remainder, plus a push-to-talk dictation helper. Both read `VOICEBOX_URL`.
 
 ## Voices
 

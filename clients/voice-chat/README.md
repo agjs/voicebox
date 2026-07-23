@@ -20,25 +20,20 @@ Key features:
 
 ## Installation
 
-1. Install the base voicebox package (includes STT/TTS server):
-   ```bash
-   cd /Users/ag/Documents/Code/voicebox
-   source .venv/bin/activate
-   pip install -e .
-   ```
+Requires a running [voicebox](https://github.com/agjs/voicebox) server for STT/TTS
+and an OpenAI-compatible LLM endpoint. The client package is separate and light
+(httpx, numpy, sounddevice, webrtcvad) — it does not install the speech server.
 
-2. Add optional audio dependencies:
-   ```bash
-   pip install sounddevice numpy webrtcvad httpx
-   ```
-   - `sounddevice`: mic input and audio playback
-   - `numpy`: audio array operations
-   - `webrtcvad`: Voice Activity Detection (falls back to energy-based if unavailable)
+```bash
+uv tool install "git+https://github.com/agjs/voicebox.git#subdirectory=clients/voice-chat"
+# or: pip install "git+https://github.com/agjs/voicebox.git#subdirectory=clients/voice-chat"
+```
 
-   For text-only mode without audio:
-   ```bash
-   pip install -e .       # httpx is part of the base voicebox dependencies
-   ```
+From a clone (editable, for development):
+
+```bash
+pip install -e clients/voice-chat
+```
 
 ## Configuration
 
@@ -62,10 +57,23 @@ Default system prompt asks for concise plain text suitable for speech.
 
 ## Usage
 
+`voicebox-chat` is a long-running interactive session: start it when you want to
+talk, leave it running through turns, press `Ctrl-C` to exit.
+
 ### Interactive Mic Mode (default)
 
 ```bash
-python clients/voice-chat/voice_chat.py
+export VOICEBOX_URL=http://localhost:8790
+export VOICEBOX_LLM_URL=http://localhost:8000/v1/chat/completions
+export VOICEBOX_LLM_MODEL=local-model
+voicebox-chat
+# or: voicebox-chat --barge-in
+```
+
+From a clone without installing the console script:
+
+```bash
+python clients/voice-chat/voice_chat.py --barge-in
 ```
 
 Starts a loop:
@@ -75,14 +83,12 @@ Starts a loop:
 4. **Synthesize & play**: A TTS worker and persistent PCM output stream run while LLM generation continues
 5. **Repeat**: Ready for next turn
 
-Press `Ctrl-C` to exit cleanly.
-
 ### Text Mode
 
 Process text directly without mic input:
 
 ```bash
-python clients/voice-chat/voice_chat.py --text "In one short sentence, what is a vector database?" --no-audio
+voicebox-chat --text "In one short sentence, what is a vector database?" --no-audio
 ```
 
 - `--text "..."`: Send text straight through LLM → sentence parser → TTS (skips STT/mic)
@@ -95,7 +101,7 @@ Useful for testing without audio hardware.
 Transcribe a WAV file, then process the transcript through LLM:
 
 ```bash
-python clients/voice-chat/voice_chat.py --file path/to/audio.wav
+voicebox-chat --file path/to/audio.wav
 ```
 
 - Expects 16 kHz mono WAV format (or any format soundfile can decode)
@@ -103,8 +109,9 @@ python clients/voice-chat/voice_chat.py --file path/to/audio.wav
 - Then processes the transcript through LLM → TTS → playback
 
 Combine with `--no-audio` to skip playback:
+
 ```bash
-python clients/voice-chat/voice_chat.py --file path/to/audio.wav --no-audio
+voicebox-chat --file path/to/audio.wav --no-audio
 ```
 
 ## Architecture
@@ -156,10 +163,8 @@ No network or audio required.
 Opt-in for interactive mic mode only (not `--text` / `--file`):
 
 ```bash
-python clients/voice-chat/voice_chat.py --barge-in
-```
-
-While the assistant is speaking (LLM + TTS + playback), a parallel VAD monitor
+voicebox-chat --barge-in
+``` (LLM + TTS + playback), a parallel VAD monitor
 listens on the mic. After ~200 ms of cumulative voiced frames, playback aborts,
 TTS/LLM streams cancel, partial assistant text stays in history, and the loop
 returns to the next listen turn. `Ctrl-C` uses the same cancel/abort path.
@@ -200,7 +205,7 @@ finishes. With `--barge-in`, speaking can abort the turn mid-playback (headphone
 
 ```bash
 $ export VOICEBOX_SYSTEM_PROMPT="You are a pirate. Respond briefly."
-$ python clients/voice-chat/voice_chat.py
+$ voicebox-chat
 Voice Chat CLI (Ctrl-C to exit)
 Recording... (speak, then pause; Ctrl-C to cancel)
 Silence detected.
@@ -219,7 +224,9 @@ Exiting...
 ## Troubleshooting
 
 ### "sounddevice not available"
-Install: `pip install sounddevice numpy`
+Reinstall the client so audio deps are present:
+`uv tool install --force "git+https://github.com/agjs/voicebox.git#subdirectory=clients/voice-chat"`
+(or `pip install -e clients/voice-chat` from a clone).
 
 ### "LLM endpoint unreachable"
 Check that your local LLM server is running at the URL set in `VOICEBOX_LLM_URL`.
@@ -229,7 +236,7 @@ Verify the voicebox server is running: `VOICEBOX_URL` should be accessible.
 
 ### "No speech recognized"
 - Check mic is unmuted and working
-- Try `python clients/voice-chat/voice_chat.py --file path/to/audio.wav` to test STT with a known audio file
+- Try `voicebox-chat --file path/to/audio.wav` to test STT with a known audio file
 - Adjust `VOICEBOX_SILENCE_MS` if silence detection is too aggressive
 
 ### "Tests failing"

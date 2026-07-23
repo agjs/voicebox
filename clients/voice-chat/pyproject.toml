@@ -1,0 +1,22 @@
+[project]
+name = "voicebox-chat"
+version = "0.2.9"
+description = "Conversational voice chat client for the voicebox speech server"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.28.0",
+  "numpy>=2.0.0",
+  "sounddevice>=0.5.0",
+  "webrtcvad>=2.0.10",
+]
+
+[project.scripts]
+voicebox-chat = "voice_chat:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["voice_chat", "pipeline"]
