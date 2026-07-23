@@ -90,8 +90,10 @@ In Admin, open Settings then Audio:
 
 Turn-taking mic conversation against voicebox STT/TTS and any OpenAI-compatible
 LLM. Optional `--barge-in` interrupts playback when you speak (headphones
-required; no AEC). This is a long-running session you start when you want voice
-(Ctrl-C to exit) — it does not attach inside Cursor/Claude/etc.
+required; no AEC). Optional `--wake` keeps a long-running process that listens
+for “hey jarvis”, then enters conversation until goodbye or idle. Start the
+session when you want voice (Ctrl-C to exit) — it does not attach inside
+Cursor/Claude/etc.
 
 ```bash
 # Install once (client-only deps; does not install the speech server)
@@ -101,7 +103,7 @@ uv tool install "git+https://github.com/agjs/voicebox.git#subdirectory=clients/v
 export VOICEBOX_URL=http://localhost:8790
 export VOICEBOX_LLM_URL=http://localhost:8000/v1/chat/completions
 export VOICEBOX_LLM_MODEL=local-model
-voicebox-chat --barge-in
+voicebox-chat --wake --barge-in
 ```
 
 More detail: [`clients/voice-chat/README.md`](clients/voice-chat/README.md).

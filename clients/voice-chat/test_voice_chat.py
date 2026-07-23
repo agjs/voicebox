@@ -5,7 +5,13 @@ import wave
 
 import numpy as np
 
-from voice_chat import PcmPlayback, VoiceChat
+from voice_chat import (
+    PcmPlayback,
+    VoiceChat,
+    WakeListener,
+    is_conversation_idle,
+    is_goodbye_phrase,
+)
 
 
 class FakeOutputStream:
@@ -224,5 +230,101 @@ def test_history_is_bounded_to_configured_turns():
             {"role": "user", "content": "8"},
             {"role": "assistant", "content": "9"},
         ]
+    finally:
+        chat.close()
+
+
+def test_is_goodbye_phrase_matches_common_exits():
+    assert is_goodbye_phrase("Goodbye!")
+    assert is_goodbye_phrase("stop listening")
+    assert is_goodbye_phrase("That's all.")
+    assert is_goodbye_phrase("goodbye everyone")
+    assert not is_goodbye_phrase("please don't say goodbye yet")
+    assert not is_goodbye_phrase("what is the weather")
+
+
+def test_is_conversation_idle():
+    assert is_conversation_idle(0.0, 300.0, 300.0)
+    assert not is_conversation_idle(0.0, 299.0, 300.0)
+    assert not is_conversation_idle(0.0, 999.0, 0.0)
+
+
+def test_wake_listener_fires_when_score_exceeds_threshold():
+    class FakeOww:
+        def __init__(self):
+            self.calls = 0
+
+        def predict(self, _frame):
+            self.calls += 1
+            return {"hey_jarvis": 0.1 if self.calls < 3 else 0.9}
+
+    class FakeInputStream:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self, frames):
+            return np.zeros((frames, 1), dtype=np.int16), False
+
+    class FakeSoundDevice:
+        def InputStream(self, **kwargs):
+            return FakeInputStream(**kwargs)
+
+    oww = FakeOww()
+    listener = WakeListener(
+        FakeSoundDevice(),
+        np,
+        model_name="hey_jarvis",
+        threshold=0.5,
+        debounce_seconds=0.0,
+        oww_model=oww,
+    )
+    listener.wait_for_wake()
+    assert oww.calls >= 3
+
+
+def test_run_conversation_session_exits_on_goodbye_without_llm_turn():
+    chat = VoiceChat()
+    chat._import_audio_libs = lambda: None  # type: ignore[method-assign]
+    chat.use_audio = False
+    turns: list[str] = []
+
+    def fake_record(*, idle_deadline=None):
+        return b"wav"
+
+    def fake_transcribe(_audio):
+        return "Goodbye!"
+
+    def fake_run_turn(text, barge_in=False):
+        turns.append(text)
+
+    chat.record_from_mic = fake_record  # type: ignore[method-assign]
+    chat.transcribe = fake_transcribe  # type: ignore[method-assign]
+    chat._run_turn = fake_run_turn  # type: ignore[method-assign]
+    try:
+        assert chat._run_conversation_session() == "goodbye"
+        assert turns == []
+    finally:
+        chat.close()
+
+
+def test_run_conversation_session_exits_on_idle():
+    chat = VoiceChat()
+    chat.wake_idle_seconds = 0.05
+    chat._import_audio_libs = lambda: None  # type: ignore[method-assign]
+    chat.use_audio = False
+
+    def fake_record(*, idle_deadline=None):
+        time.sleep(0.06)
+        return None
+
+    chat.record_from_mic = fake_record  # type: ignore[method-assign]
+    try:
+        assert chat._run_conversation_session() == "idle"
     finally:
         chat.close()
