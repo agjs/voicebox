@@ -20,10 +20,120 @@ import httpx
 from pipeline import ReasoningFilter, SentenceChunker, parse_sse_stream
 
 _BARGE_MIN_VOICED_MS = 200
+_WAKE_CHUNK_SAMPLES = 1280  # 80 ms at 16 kHz (openWakeWord default)
+_GOODBYE_PHRASES = frozenset(
+    {
+        "goodbye",
+        "good bye",
+        "bye",
+        "stop listening",
+        "that's all",
+        "thats all",
+        "that is all",
+    }
+)
 
 
 def get_env(key: str, default: str) -> str:
     return os.getenv(key, default)
+
+
+def normalize_utterance(text: str) -> str:
+    cleaned = text.strip().lower()
+    return cleaned.rstrip(".,!?;:").strip()
+
+
+def is_goodbye_phrase(text: str) -> bool:
+    """True when STT text is a session-end phrase (do not send to the LLM)."""
+    normalized = normalize_utterance(text)
+    if not normalized:
+        return False
+    if normalized in _GOODBYE_PHRASES:
+        return True
+    return any(normalized.startswith(f"{phrase} ") for phrase in _GOODBYE_PHRASES)
+
+
+def is_conversation_idle(last_activity: float, now: float, idle_seconds: float) -> bool:
+    return idle_seconds > 0 and (now - last_activity) >= idle_seconds
+
+
+def wake_score_key(prediction: dict, model_name: str) -> str | None:
+    """Resolve which prediction dict key matches the configured wake model."""
+    if model_name in prediction:
+        return model_name
+    # openWakeWord sometimes keys by stem (hey_jarvis) or path basename.
+    for key in prediction:
+        if key == model_name or key.endswith(model_name) or model_name in key:
+            return key
+    return None
+
+
+class WakeListener:
+    """Block until openWakeWord reports the configured wake phrase."""
+
+    def __init__(
+        self,
+        sounddevice,
+        np_module,
+        *,
+        model_name: str = "hey_jarvis",
+        threshold: float = 0.5,
+        debounce_seconds: float = 1.5,
+        oww_model=None,
+    ) -> None:
+        self._sounddevice = sounddevice
+        self._np = np_module
+        self.model_name = model_name
+        self.threshold = threshold
+        self.debounce_seconds = debounce_seconds
+        self._model = oww_model
+
+    def _ensure_model(self):
+        if self._model is not None:
+            return self._model
+        import openwakeword.utils
+        from openwakeword.model import Model
+
+        openwakeword.utils.download_models()
+        self._model = Model(
+            wakeword_models=[self.model_name],
+            inference_framework="onnx",
+        )
+        return self._model
+
+    def wait_for_wake(self) -> None:
+        model = self._ensure_model()
+        sample_rate = 16000
+        print(
+            f"Wake listening for '{self.model_name}' "
+            f"(threshold={self.threshold:.2f}; Ctrl-C to exit)...",
+            file=sys.stderr,
+        )
+        with self._sounddevice.InputStream(
+            samplerate=sample_rate,
+            channels=1,
+            dtype="int16",
+            blocksize=_WAKE_CHUNK_SAMPLES,
+            latency="low",
+        ) as stream:
+            while True:
+                audio_chunk, _overflowed = stream.read(_WAKE_CHUNK_SAMPLES)
+                frame = self._np.asarray(audio_chunk, dtype=self._np.int16).reshape(-1)
+                if frame.size < _WAKE_CHUNK_SAMPLES:
+                    padded = self._np.zeros(_WAKE_CHUNK_SAMPLES, dtype=self._np.int16)
+                    padded[: frame.size] = frame
+                    frame = padded
+                elif frame.size > _WAKE_CHUNK_SAMPLES:
+                    frame = frame[:_WAKE_CHUNK_SAMPLES]
+                prediction = model.predict(frame)
+                key = wake_score_key(prediction, self.model_name)
+                if key is None:
+                    continue
+                score = float(prediction[key])
+                if score >= self.threshold:
+                    print(f"(Wake word detected: {key}={score:.2f})", file=sys.stderr)
+                    time.sleep(self.debounce_seconds)
+                    return
 
 
 class PcmPlayback:
@@ -155,6 +265,9 @@ class VoiceChat:
             "VOICEBOX_SYSTEM_PROMPT",
             "You are a helpful assistant. Respond concisely in plain text suitable for speech.",
         )
+        self.wake_model = get_env("VOICEBOX_WAKE_MODEL", "hey_jarvis")
+        self.wake_threshold = float(get_env("VOICEBOX_WAKE_THRESHOLD", "0.5"))
+        self.wake_idle_seconds = float(get_env("VOICEBOX_WAKE_IDLE_SECONDS", "300"))
         self.use_audio = True
         self.chat_history: list[dict[str, str]] = []
         self._sounddevice = None
@@ -230,8 +343,12 @@ class VoiceChat:
             noise_levels.append(rms)
         return is_speech
 
-    def record_from_mic(self) -> Optional[bytes]:
-        """Record 16 kHz mono audio with speech-aware pre-roll and endpointing."""
+    def record_from_mic(self, *, idle_deadline: float | None = None) -> Optional[bytes]:
+        """Record 16 kHz mono audio with speech-aware pre-roll and endpointing.
+
+        If idle_deadline is set and reached before speech starts, return None so the
+        wake loop can treat the conversation as idle.
+        """
         if not self._sounddevice or self._np is None:
             print("Error: sounddevice and numpy are required", file=sys.stderr)
             return None
@@ -263,6 +380,13 @@ class VoiceChat:
                 latency="low",
             ) as stream:
                 while len(frames) < max_frames:
+                    if (
+                        not speech_started
+                        and idle_deadline is not None
+                        and time.monotonic() >= idle_deadline
+                    ):
+                        print("(Conversation idle timeout)", file=sys.stderr)
+                        return None
                     audio_chunk, overflowed = stream.read(frame_samples)
                     if overflowed:
                         print("Warning: microphone buffer overflow", file=sys.stderr)
@@ -303,7 +427,7 @@ class VoiceChat:
                         break
         except KeyboardInterrupt:
             print("\nRecording cancelled.", file=sys.stderr)
-            return None
+            raise
         except Exception as exc:
             print(f"Error recording: {exc}", file=sys.stderr)
             return None
@@ -560,6 +684,81 @@ class VoiceChat:
         except KeyboardInterrupt:
             print("\nExiting...", file=sys.stderr)
 
+    def _speak_ack(self, text: str) -> None:
+        """Play a short acknowledgment through voicebox TTS when audio is available."""
+        if not self.use_audio or not self._sounddevice:
+            print(text, file=sys.stderr)
+            return
+        playback = PcmPlayback(self._sounddevice)
+        try:
+            for sample_rate, chunk in self.stream_speech(text):
+                playback.write(sample_rate, chunk)
+        finally:
+            playback.finish()
+
+    def _run_conversation_session(self, barge_in: bool = False) -> str:
+        """Run conversation turns until goodbye or idle. Returns 'goodbye' or 'idle'."""
+        last_activity = time.monotonic()
+        while True:
+            now = time.monotonic()
+            if is_conversation_idle(last_activity, now, self.wake_idle_seconds):
+                return "idle"
+            idle_deadline = last_activity + self.wake_idle_seconds
+            audio_bytes = self.record_from_mic(idle_deadline=idle_deadline)
+            if not audio_bytes:
+                if is_conversation_idle(last_activity, time.monotonic(), self.wake_idle_seconds):
+                    return "idle"
+                continue
+            started = time.perf_counter()
+            user_text = self.transcribe(audio_bytes)
+            if self.show_timings:
+                print(
+                    f"[timing] speech upload + STT: {time.perf_counter() - started:.3f}s",
+                    file=sys.stderr,
+                )
+            if not user_text:
+                print("(No speech recognized)", file=sys.stderr)
+                continue
+            print(f"User: {user_text}")
+            if is_goodbye_phrase(user_text):
+                return "goodbye"
+            last_activity = time.monotonic()
+            self._run_turn(user_text, barge_in=barge_in)
+
+    def run_wake_loop(self, barge_in: bool = False) -> None:
+        """Always-on wake listen → conversation → wake again until Ctrl-C."""
+        self._import_audio_libs()
+        if not self._sounddevice or self._np is None:
+            print("Error: --wake requires sounddevice and numpy", file=sys.stderr)
+            return
+        if not self.chat_history:
+            self.chat_history = [{"role": "system", "content": self.system_prompt}]
+        mode = "barge-in on; headphones recommended" if barge_in else "half-duplex"
+        print(
+            f"Voice Chat wake mode ({mode}; say goodbye or wait "
+            f"{int(self.wake_idle_seconds)}s idle to sleep; Ctrl-C to exit)",
+            file=sys.stderr,
+        )
+        listener = WakeListener(
+            self._sounddevice,
+            self._np,
+            model_name=self.wake_model,
+            threshold=self.wake_threshold,
+        )
+        try:
+            while True:
+                listener.wait_for_wake()
+                self._speak_ack("Listening.")
+                reason = self._run_conversation_session(barge_in=barge_in)
+                if reason == "goodbye":
+                    self._speak_ack("Goodbye.")
+                    print("(Session ended: goodbye)", file=sys.stderr)
+                else:
+                    self._speak_ack("Going to sleep.")
+                    print("(Session ended: idle)", file=sys.stderr)
+        except KeyboardInterrupt:
+            print("\nExiting...", file=sys.stderr)
+
     def run_text_mode(self, text: str, no_audio: bool = False) -> None:
         self.use_audio = not no_audio
         self._import_audio_libs()
@@ -597,7 +796,17 @@ def main() -> None:
         action="store_true",
         help="Interrupt TTS when you speak (interactive mic mode; headphones recommended)",
     )
+    parser.add_argument(
+        "--wake",
+        action="store_true",
+        help=(
+            "Always-on wake word (default hey jarvis), then conversation until "
+            "goodbye or idle timeout"
+        ),
+    )
     args = parser.parse_args()
+    if args.wake and (args.text or args.file):
+        parser.error("--wake cannot be combined with --text or --file")
 
     chat = VoiceChat()
     try:
@@ -605,6 +814,8 @@ def main() -> None:
             chat.run_text_mode(args.text, no_audio=args.no_audio)
         elif args.file:
             chat.run_file_mode(args.file, no_audio=args.no_audio)
+        elif args.wake:
+            chat.run_wake_loop(barge_in=args.barge_in)
         else:
             chat.run_interactive(barge_in=args.barge_in)
     finally:

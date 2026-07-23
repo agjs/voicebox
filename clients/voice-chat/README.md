@@ -15,14 +15,15 @@ Key features:
 - **Turn-taking loop**: record until silence (VAD), send to STT, stream from LLM, synthesize and play responses incrementally
 - **Reasoning stripping**: removes `<think>...</think>` blocks from models like DeepSeek so they're never spoken
 - **Sentence chunking**: parses streamed LLM output and emits complete sentences as they're detected (`.?!` or newline), so TTS can start while the LLM is still generating
-- **Multiple modes**: interactive mic mode (optional `--barge-in`), `--text` for direct text input, `--file` for WAV file transcription
+- **Multiple modes**: interactive mic (optional `--barge-in`), `--wake` for hey-jarvis activation, `--text`, `--file`
 - **Graceful degradation**: audio libraries are optional (lazy-imported) so `--text --no-audio` and tests work without audio dependencies
 
 ## Installation
 
 Requires a running [voicebox](https://github.com/agjs/voicebox) server for STT/TTS
 and an OpenAI-compatible LLM endpoint. The client package is separate and light
-(httpx, numpy, sounddevice, webrtcvad) — it does not install the speech server.
+(httpx, numpy, sounddevice, webrtcvad, openwakeword) — it does not install the
+speech server. First `--wake` run downloads openWakeWord model files once.
 
 ```bash
 uv tool install "git+https://github.com/agjs/voicebox.git#subdirectory=clients/voice-chat"
@@ -52,6 +53,9 @@ All configuration is via environment variables (defaults are generic):
 | `VOICEBOX_MAX_HISTORY_TURNS` | `8` | Conversation turns retained for LLM latency control |
 | `VOICEBOX_SHOW_TIMINGS` | `0` | Set to `1` for STT, first-token, and first-audio timings |
 | `VOICEBOX_SYSTEM_PROMPT` | (see below) | System prompt for LLM |
+| `VOICEBOX_WAKE_MODEL` | `hey_jarvis` | openWakeWord pretrained model id |
+| `VOICEBOX_WAKE_THRESHOLD` | `0.5` | Minimum wake score to activate |
+| `VOICEBOX_WAKE_IDLE_SECONDS` | `300` | Silence after last utterance before sleep |
 
 Default system prompt asks for concise plain text suitable for speech.
 
@@ -82,6 +86,25 @@ Starts a loop:
 3. **Stream LLM**: Sends your utterance + chat history to the LLM
 4. **Synthesize & play**: A TTS worker and persistent PCM output stream run while LLM generation continues
 5. **Repeat**: Ready for next turn
+
+### Wake Mode
+
+Always-on mic listen for the wake phrase, then enter conversation until you say
+goodbye (or idle times out), then listen for wake again. Chat history is kept
+across wake cycles for the life of the process.
+
+```bash
+voicebox-chat --wake
+# or: voicebox-chat --wake --barge-in
+```
+
+- Default wake phrase: **hey jarvis** (`VOICEBOX_WAKE_MODEL`)
+- End session: say **goodbye**, **stop listening**, or **that's all**; or wait
+  `VOICEBOX_WAKE_IDLE_SECONDS` (default 5 minutes) with no speech
+- Cannot combine with `--text` / `--file`
+- Wake listening keeps the mic open continuously; room walking works better with
+  a headset or a good far-field mic. Headphones are still recommended when using
+  `--barge-in` during conversation (no AEC).
 
 ### Text Mode
 
