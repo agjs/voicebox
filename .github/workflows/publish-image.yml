@@ -59,7 +59,7 @@ jobs:
             type=sha,prefix=sha-,format=short
 
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # amd64 is the k3s node arch. The build downloads STT+TTS models into the
       # image (fetch_models.py), so the first build is a few minutes.
@@ -148,7 +148,7 @@ jobs:
             type=raw,value=manual,enable=${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build and push CUDA image
         uses: docker/build-push-action@v6
