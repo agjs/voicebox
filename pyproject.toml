@@ -9,7 +9,7 @@ description = "Self-hosted OpenAI-compatible speech server (STT + streaming TTS)
 requires-python = ">=3.11,<3.12"
 dependencies = [
   "av==18.0.0",
-  "fastapi==0.139.2",
+  "fastapi==0.140.0",
   "uvicorn[standard]==0.51.0",
   "python-multipart==0.0.32",
   "faster-whisper==1.2.1",
