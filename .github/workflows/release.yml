@@ -1,0 +1,81 @@
+name: Release
+
+# On every push to main (typically a merged PR), bump the patch version, commit,
+# tag vX.Y.Z, and create a GitHub Release. The tag push triggers publish-image
+# for the pinnable GHCR tags (including CUDA).
+#
+# Skips commits that are themselves release bumps to avoid a loop.
+# Override the bump size with workflow_dispatch (patch/minor/major).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      part:
+        description: Semver component to bump
+        required: true
+        default: patch
+        type: choice
+        options: [patch, minor, major]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'push' &&
+        !startsWith(github.event.head_commit.message, 'chore: release')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          # Push the release commit and tag back to main.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version
+        id: bump
+        env:
+          PART: ${{ inputs.part || 'patch' }}
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 scripts/bump_version.py --part "$PART")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Bumped to $VERSION"
+
+      - name: Commit, tag, and push
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          set -euo pipefail
+          git add pyproject.toml clients/voice-chat/pyproject.toml \
+            src/voicebox/app.py README.md assets/banner.svg assets/social.svg
+          git commit -m "chore: release ${VERSION}"
+          git tag -a "v${VERSION}" -m "v${VERSION}"
+          git push origin HEAD:main
+          git push origin "v${VERSION}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --generate-notes
