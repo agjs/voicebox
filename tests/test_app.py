@@ -62,6 +62,13 @@ def test_health(client):
     assert r.json() == {"status": "ok", "models_loaded": True}
 
 
+def test_health_reports_not_ready_without_engines():
+    client = TestClient(create_app(None, None, load_settings()))
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "starting", "models_loaded": False}
+
+
 def test_list_models(client):
     r = client.get("/v1/models")
     assert r.status_code == 200

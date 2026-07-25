@@ -16,7 +16,7 @@ def main() -> None:
     else:  # load_settings validates this; retain a defensive guard.
         raise ValueError(f"unsupported TTS engine: {settings.tts_engine}")
     application = create_app(SttEngine(settings), tts, settings)
-    uvicorn.run(application, host="0.0.0.0", port=settings.port)
+    uvicorn.run(application, host=settings.bind_address, port=settings.port)
 
 
 if __name__ == "__main__":
