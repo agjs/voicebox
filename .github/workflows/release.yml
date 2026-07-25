@@ -1,8 +1,9 @@
 name: Release
 
 # On every push to main (typically a merged PR), bump the patch version, commit,
-# tag vX.Y.Z, and create a GitHub Release. The tag push triggers publish-image
-# for the pinnable GHCR tags (including CUDA).
+# tag vX.Y.Z, and create a GitHub Release. Then explicitly workflow_dispatch
+# Publish image on that tag (GITHUB_TOKEN tag pushes do not trigger other
+# workflows, so we cannot rely on the tag push event alone).
 #
 # Skips commits that are themselves release bumps to avoid a loop.
 # Override the bump size with workflow_dispatch (patch/minor/major).
@@ -21,6 +22,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: release-main
@@ -79,3 +81,12 @@ jobs:
           gh release create "v${VERSION}" \
             --title "v${VERSION}" \
             --generate-notes
+
+      - name: Publish versioned GHCR images
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          set -euo pipefail
+          # GITHUB_TOKEN tag pushes do not start other workflows; dispatch explicitly.
+          gh workflow run "Publish image" --ref "v${VERSION}"

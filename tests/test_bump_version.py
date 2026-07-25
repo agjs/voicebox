@@ -29,7 +29,13 @@ def test_bump_parts():
 
 
 def test_read_version_from_repo():
-    assert bump_version.read_version(ROOT) == (0, 2, 9)
+    major, minor, patch = bump_version.read_version(ROOT)
+    assert major >= 0
+    assert minor >= 0
+    assert patch >= 0
+    assert bump_version.format_version((major, minor, patch)) in (
+        ROOT / "pyproject.toml"
+    ).read_text(encoding="utf-8")
 
 
 def test_apply_version_updates_all_markers(tmp_path: Path):
@@ -66,5 +72,7 @@ def test_apply_version_updates_all_markers(tmp_path: Path):
 
 
 def test_cli_dry_run(capsys: pytest.CaptureFixture[str]):
+    current = bump_version.read_version(ROOT)
+    expected = bump_version.format_version(bump_version.bump("patch", current))
     assert bump_version.main(["--dry-run", "--part", "patch"]) == 0
-    assert capsys.readouterr().out.strip() == "0.2.10"
+    assert capsys.readouterr().out.strip() == expected
