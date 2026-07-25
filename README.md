@@ -248,9 +248,9 @@ docker compose up -d --build && ./scripts/smoke.sh   # end-to-end
 # Published images are also smoked in CI after push (and weekly via image-smoke.yml)
 ```
 
-Merges to `main` automatically patch-bump the version, tag `vX.Y.Z`, and create a
-GitHub Release (see [`.github/workflows/release.yml`](.github/workflows/release.yml)).
-That tag build publishes the pinnable GHCR image (and CUDA). For a minor/major bump,
+Merges to `main` automatically patch-bump the version, tag `vX.Y.Z`, create a
+GitHub Release, and dispatch the GHCR publish for that tag (see
+[`.github/workflows/release.yml`](.github/workflows/release.yml)). For a minor/major bump,
 run the **Release** workflow manually and pick the part. Skip a release with a commit
 message starting with `chore: release` (the bot uses that) or by not merging to main.
 
