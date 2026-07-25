@@ -26,5 +26,9 @@ RUN python scripts/fetch_models.py
 ENV HF_HUB_OFFLINE=1
 
 ENV VOICEBOX_PORT=8790
+# Inside a container the process must listen on all interfaces; host publish
+# (compose VOICEBOX_BIND_ADDRESS) controls external exposure.
+ENV VOICEBOX_BIND_ADDRESS=0.0.0.0
+ENV VOICEBOX_ALLOW_INSECURE_BIND=true
 EXPOSE 8790
 CMD ["python", "-m", "voicebox"]

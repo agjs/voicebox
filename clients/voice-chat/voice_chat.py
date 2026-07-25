@@ -17,7 +17,7 @@ from typing import Generator, Iterator, Optional
 
 import httpx
 
-from pipeline import ReasoningFilter, SentenceChunker, parse_sse_stream
+from backend import Backend, OpenAIChatBackend, TurnEvent
 
 _BARGE_MIN_VOICED_MS = 200
 _WAKE_CHUNK_SAMPLES = 1280  # 80 ms at 16 kHz (openWakeWord default)
@@ -246,7 +246,7 @@ class TtsPipeline:
 
 
 class VoiceChat:
-    def __init__(self) -> None:
+    def __init__(self, backend: Backend | None = None) -> None:
         self.voicebox_url = get_env("VOICEBOX_URL", "http://localhost:8790")
         self.voicebox_api_key = os.getenv("VOICEBOX_API_KEY")
         self.llm_url = get_env("VOICEBOX_LLM_URL", "http://localhost:8000/v1/chat/completions")
@@ -270,6 +270,8 @@ class VoiceChat:
         self.wake_idle_seconds = float(get_env("VOICEBOX_WAKE_IDLE_SECONDS", "300"))
         self.use_audio = True
         self.chat_history: list[dict[str, str]] = []
+        self._backend_override = backend
+        self.backend: Backend | None = backend
         self._sounddevice = None
         self._webrtcvad = None
         self._np = None
@@ -277,6 +279,16 @@ class VoiceChat:
             timeout=httpx.Timeout(connect=3, read=60, write=30, pool=5),
             limits=httpx.Limits(max_connections=4, max_keepalive_connections=4),
         )
+
+    def _ensure_backend(self) -> Backend:
+        if self.backend is not None:
+            return self.backend
+        self.backend = OpenAIChatBackend(
+            stream_chunks=self.stream_llm_response,
+            history=self.chat_history,
+            max_history_turns=self.max_history_turns,
+        )
+        return self.backend
 
     def close(self) -> None:
         self._http.close()
@@ -560,7 +572,15 @@ class VoiceChat:
     def _trim_history(self) -> None:
         max_messages = self.max_history_turns * 2
         if len(self.chat_history) > max_messages + 1:
-            self.chat_history = [self.chat_history[0], *self.chat_history[-max_messages:]]
+            self.chat_history[:] = [self.chat_history[0], *self.chat_history[-max_messages:]]
+
+    def _reset_session_history(self) -> None:
+        self.chat_history.clear()
+        self.chat_history.append({"role": "system", "content": self.system_prompt})
+        if self._backend_override is None and isinstance(self.backend, OpenAIChatBackend):
+            self.backend.history = self.chat_history
+        elif self._backend_override is None:
+            self.backend = None
 
     def _cancel_turn(self, cancel: threading.Event, pipeline: TtsPipeline | None) -> None:
         cancel.set()
@@ -579,14 +599,9 @@ class VoiceChat:
         pipeline.playback.abort()
 
     def _run_turn(self, user_text: str, barge_in: bool = False) -> None:
-        self.chat_history.append({"role": "user", "content": user_text})
-        self._trim_history()
-
+        backend = self._ensure_backend()
         print("Assistant: ", end="", flush=True)
         turn_started = time.perf_counter()
-        assistant_parts: list[str] = []
-        reasoning_filter = ReasoningFilter()
-        chunker = SentenceChunker()
         first_visible_token = True
         cancel = threading.Event()
         turn_done = threading.Event()
@@ -603,39 +618,34 @@ class VoiceChat:
                 )
                 barge_thread.start()
 
-        def process_visible_text(text: str) -> None:
+        def handle_event(event: TurnEvent) -> None:
             nonlocal first_visible_token
-            if not text or cancel.is_set():
+            if cancel.is_set():
                 return
-            if first_visible_token:
-                first_visible_token = False
-                if self.show_timings:
-                    elapsed = time.perf_counter() - turn_started
-                    print(f"\n[timing] first LLM text: {elapsed:.3f}s", file=sys.stderr)
-            assistant_parts.append(text)
-            print(text, end="", flush=True)
-            for sentence in chunker.feed(text):
-                if pipeline is not None and not cancel.is_set():
+            if event["type"] == "speak":
+                text = event["text"]
+                if first_visible_token:
+                    first_visible_token = False
+                    if self.show_timings:
+                        elapsed = time.perf_counter() - turn_started
+                        print(f"\n[timing] first LLM text: {elapsed:.3f}s", file=sys.stderr)
+                print(text, end=" ", flush=True)
+                if pipeline is not None:
                     try:
-                        pipeline.sentences.put(sentence, timeout=0.1)
+                        pipeline.sentences.put(text, timeout=0.1)
                     except queue.Full:
                         pass
+            elif event["type"] == "approval_request":
+                print(
+                    f"\n[approval] {event.get('id', '?')}: {event['prompt']}",
+                    file=sys.stderr,
+                )
 
         try:
-            for token in parse_sse_stream(
-                self.stream_llm_response(self.chat_history, cancel=cancel)
-            ):
+            for event in backend.run_turn(user_text, cancel=cancel):
                 if cancel.is_set():
                     break
-                process_visible_text(reasoning_filter.feed(token))
-            if not cancel.is_set():
-                process_visible_text(reasoning_filter.flush())
-                remainder = chunker.flush()
-                if remainder and pipeline is not None:
-                    try:
-                        pipeline.sentences.put(remainder, timeout=0.1)
-                    except queue.Full:
-                        pass
+                handle_event(event)
         except KeyboardInterrupt:
             print("\n(LLM stream interrupted)", file=sys.stderr)
             self._cancel_turn(cancel, pipeline)
@@ -653,15 +663,11 @@ class VoiceChat:
                         pass
                 pipeline.thread.join(timeout=2 if cancel.is_set() else None)
 
-        assistant_text = "".join(assistant_parts)
         print()
-        if assistant_text:
-            self.chat_history.append({"role": "assistant", "content": assistant_text})
-            self._trim_history()
 
     def run_interactive(self, barge_in: bool = False) -> None:
         self._import_audio_libs()
-        self.chat_history = [{"role": "system", "content": self.system_prompt}]
+        self._reset_session_history()
         mode = "barge-in on; headphones recommended" if barge_in else "half-duplex"
         print(f"Voice Chat CLI ({mode}; Ctrl-C to exit)", file=sys.stderr)
         try:
@@ -732,7 +738,7 @@ class VoiceChat:
             print("Error: --wake requires sounddevice and numpy", file=sys.stderr)
             return
         if not self.chat_history:
-            self.chat_history = [{"role": "system", "content": self.system_prompt}]
+            self._reset_session_history()
         mode = "barge-in on; headphones recommended" if barge_in else "half-duplex"
         print(
             f"Voice Chat wake mode ({mode}; say goodbye or wait "
@@ -762,7 +768,7 @@ class VoiceChat:
     def run_text_mode(self, text: str, no_audio: bool = False) -> None:
         self.use_audio = not no_audio
         self._import_audio_libs()
-        self.chat_history = [{"role": "system", "content": self.system_prompt}]
+        self._reset_session_history()
         print(f"User: {text}")
         self._run_turn(text)
 
@@ -779,7 +785,7 @@ class VoiceChat:
         if not user_text:
             print("(No speech recognized)", file=sys.stderr)
             return
-        self.chat_history = [{"role": "system", "content": self.system_prompt}]
+        self._reset_session_history()
         print(f"User: {user_text}")
         self._run_turn(user_text)
 

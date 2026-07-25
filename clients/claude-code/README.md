@@ -22,12 +22,14 @@ For local dictation only:
 ### 1. Copy the scripts to your system
 
 ```bash
-cp speak.sh ~/.local/bin/voicebox-speak.sh
-chmod +x ~/.local/bin/voicebox-speak.sh
-
-cp dictate.py ~/.local/bin/voicebox-dictate
-chmod +x ~/.local/bin/voicebox-dictate
+mkdir -p ~/.local/bin
+cp speak.sh speak_text.py dictate.py ~/.local/bin/
+mv ~/.local/bin/speak.sh ~/.local/bin/voicebox-speak.sh
+mv ~/.local/bin/dictate.py ~/.local/bin/voicebox-dictate
+chmod +x ~/.local/bin/voicebox-speak.sh ~/.local/bin/voicebox-dictate
 ```
+
+`voicebox-speak.sh` expects `speak_text.py` beside it in `~/.local/bin`.
 
 (Ensure `~/.local/bin` is in your `$PATH`.)
 

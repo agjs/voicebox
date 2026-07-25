@@ -2,6 +2,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+_LOOPBACK_BINDS = frozenset({"127.0.0.1", "::1", "localhost"})
+
 
 def _env_bool(name: str, default: bool) -> bool:
     value = os.getenv(name)
@@ -13,6 +15,28 @@ def _env_bool(name: str, default: bool) -> bool:
     if normalized in {"0", "false", "no", "off"}:
         return False
     raise ValueError(f"{name} must be true or false, got {value!r}")
+
+
+def is_loopback_bind(address: str) -> bool:
+    return address.strip().lower() in _LOOPBACK_BINDS
+
+
+def validate_bind_auth(
+    bind_address: str, *, api_key: str | None, allow_insecure_bind: bool
+) -> None:
+    """Refuse non-loopback listens without an API key unless explicitly opted in.
+
+    Docker Compose listens on 0.0.0.0 inside the container and sets
+    VOICEBOX_ALLOW_INSECURE_BIND=true by default; host publish still controls
+    exposure. Bare-metal / LAN binds to a real interface require VOICEBOX_API_KEY.
+    """
+    if is_loopback_bind(bind_address) or api_key or allow_insecure_bind:
+        return
+    raise ValueError(
+        f"VOICEBOX_API_KEY is required when VOICEBOX_BIND_ADDRESS={bind_address!r} "
+        "(non-loopback). Set a key, bind 127.0.0.1, or set "
+        "VOICEBOX_ALLOW_INSECURE_BIND=true only on a trusted network."
+    )
 
 
 @dataclass(frozen=True)
@@ -33,6 +57,8 @@ class Settings:
     piper_noise_w: float
     default_voice: str
     port: int
+    bind_address: str
+    allow_insecure_bind: bool
     api_key: str | None
     device: str
     cpu_threads: int
@@ -67,6 +93,8 @@ def load_settings() -> Settings:
         piper_noise_w=float(os.getenv("VOICEBOX_PIPER_NOISE_W", "0.8")),
         default_voice=os.getenv("VOICEBOX_DEFAULT_VOICE", "af_heart"),
         port=int(os.getenv("VOICEBOX_PORT", "8790")),
+        bind_address=os.getenv("VOICEBOX_BIND_ADDRESS", "127.0.0.1"),
+        allow_insecure_bind=_env_bool("VOICEBOX_ALLOW_INSECURE_BIND", False),
         api_key=os.getenv("VOICEBOX_API_KEY") or None,
         device=os.getenv("VOICEBOX_DEVICE", "cpu"),
         cpu_threads=int(os.getenv("VOICEBOX_CPU_THREADS", "4")),
@@ -86,4 +114,11 @@ def load_settings() -> Settings:
         raise ValueError("VOICEBOX_STT_MIN_SILENCE_MS must not be negative")
     if settings.max_audio_seconds < 1 or settings.max_upload_mb < 1:
         raise ValueError("audio limits must be positive")
+    if not settings.bind_address.strip():
+        raise ValueError("VOICEBOX_BIND_ADDRESS must not be empty")
+    validate_bind_auth(
+        settings.bind_address,
+        api_key=settings.api_key,
+        allow_insecure_bind=settings.allow_insecure_bind,
+    )
     return settings

@@ -52,3 +52,16 @@ def test_init_with_bad_model_raises_runtime_error(monkeypatch, settings_factory)
         TtsEngine(settings)
     assert "Failed to load TTS model" in str(exc_info.value)
     assert "invalid/model" in str(exc_info.value)
+
+
+def test_list_voice_ids_uses_kokoro_catalog(monkeypatch, settings_factory):
+    from voicebox.tts import TtsEngine
+
+    class FakeKokoro:
+        def get_voices(self):
+            return ["af_bella", "af_heart", "bf_emma"]
+
+    monkeypatch.setattr("voicebox.tts.hf_hub_download", lambda *args, **kwargs: "/tmp/fake")
+    monkeypatch.setattr("voicebox.tts.Kokoro", lambda *args, **kwargs: FakeKokoro())
+    engine = TtsEngine(settings_factory())
+    assert engine.list_voice_ids() == ["af_bella", "af_heart", "bf_emma"]

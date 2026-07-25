@@ -16,6 +16,7 @@ Key features:
 - **Reasoning stripping**: removes `<think>...</think>` blocks from models like DeepSeek so they're never spoken
 - **Sentence chunking**: parses streamed LLM output and emits complete sentences as they're detected (`.?!` or newline), so TTS can start while the LLM is still generating
 - **Multiple modes**: interactive mic (optional `--barge-in`), `--wake` for hey-jarvis activation, `--text`, `--file`
+- **Pluggable backend**: `Backend.run_turn(text)` yields `speak` / `approval_request` / `done` events. `OpenAIChatBackend` is the default; private agents can inject their own implementation without forking this client.
 - **Graceful degradation**: audio libraries are optional (lazy-imported) so `--text --no-audio` and tests work without audio dependencies
 
 ## Installation

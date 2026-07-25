@@ -47,6 +47,8 @@ def create_app(stt, tts, settings: Settings) -> FastAPI:
     # one model inference active prevents STT and TTS from fighting for the same cores.
     inference_lock = threading.Lock()
     app.state.inference_lock = inference_lock
+    # Caller constructs engines before create_app; both present means ready to serve.
+    app.state.models_loaded = stt is not None and tts is not None
 
     @app.middleware("http")
     async def authenticate(request: Request, call_next):
@@ -63,7 +65,11 @@ def create_app(stt, tts, settings: Settings) -> FastAPI:
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "models_loaded": True}
+        models_loaded = bool(getattr(app.state, "models_loaded", False))
+        return {
+            "status": "ok" if models_loaded else "starting",
+            "models_loaded": models_loaded,
+        }
 
     @app.get("/v1/models")
     def list_models():

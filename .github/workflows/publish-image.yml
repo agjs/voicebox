@@ -24,23 +24,7 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-      - name: Install
-        run: pip install -e ".[dev]"
-      - name: Validate
-        run: |
-          ruff check .
-          ruff format --check src tests clients scripts
-          pytest -q -m "not model and not latency"
-          bash -n clients/claude-code/speak.sh
-          docker compose config -q
-          docker compose --profile cuda config -q
+    uses: ./.github/workflows/ci-checks.yml
 
   build-push:
     needs: test
@@ -48,6 +32,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      version_tag: ${{ steps.smoke_tag.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -87,6 +73,49 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Select smoke image tag
+        id: smoke_tag
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=main" >> "$GITHUB_OUTPUT"
+          fi
+
+  smoke:
+    needs: build-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull and smoke-test image
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-push.outputs.version_tag }}
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE"
+          cid=$(docker run -d --rm -p 127.0.0.1:8790:8790 \
+            -e VOICEBOX_BIND_ADDRESS=0.0.0.0 \
+            -e VOICEBOX_ALLOW_INSECURE_BIND=true \
+            "$IMAGE")
+          cleanup() { docker stop "$cid" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8790/health >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          ./scripts/smoke.sh http://127.0.0.1:8790
 
   build-push-cuda:
     needs: test

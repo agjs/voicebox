@@ -31,13 +31,19 @@ voice with no glue code.
 
 ## Quick start
 
-You only need Docker. The models are baked into the image. Compose binds to
-localhost by default; set a private bind address when clients are on another machine.
+You only need Docker. Prefer the published image (models already baked in). Compose
+publishes to localhost by default; set a private host bind address when clients are
+on another machine.
 
 ```bash
+# Fastest: pull a release (or :main) from GHCR
+docker pull ghcr.io/agjs/voicebox:0.2.9
+docker run --rm -p 127.0.0.1:8790:8790 ghcr.io/agjs/voicebox:0.2.9
+
+# Or build locally (first build downloads models; a few minutes)
 git clone https://github.com/agjs/voicebox.git && cd voicebox
 cp .env.example .env
-docker compose up -d --build      # first build downloads the models (a few minutes)
+docker compose up -d --build
 
 curl -fsS localhost:8790/health   # {"status":"ok","models_loaded":true}
 ```
@@ -62,12 +68,28 @@ curl -fsS localhost:8790/v1/audio/transcriptions \
 Point any OpenAI-audio-compatible client at `http://<host>:8790/v1` and you are done.
 
 For LAN access, set `VOICEBOX_BIND_ADDRESS` to a private IP on the host (or
-`0.0.0.0` when a firewall controls access). Set `VOICEBOX_API_KEY` as well; clients
-can send it as an OpenAI-style bearer token. The health endpoint intentionally
-remains unauthenticated for container probes.
+`0.0.0.0` when a firewall controls access). Set `VOICEBOX_API_KEY` as well, and set
+`VOICEBOX_ALLOW_INSECURE_BIND=false` so the process refuses unauthenticated
+non-loopback listens. Clients send the key as an OpenAI-style bearer token. The
+health endpoint intentionally remains unauthenticated for container probes.
 
-> No Docker? `pip install -e ".[dev]" && python -m voicebox` also works. It needs
-> `ffmpeg` and `espeak-ng` on the host.
+### Bare metal (no Docker)
+
+Requires **Python 3.11** (the upper bound is `<3.12` until native deps are validated
+on newer CPythons), plus host packages `ffmpeg` and `espeak-ng`.
+
+```bash
+python3.11 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+# Optional: pre-seed models (otherwise first start downloads them)
+python scripts/fetch_models.py
+export HF_HOME="${HF_HOME:-$PWD/models/huggingface}"
+export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4   # match VOICEBOX_CPU_THREADS
+python -m voicebox   # listens on 127.0.0.1:8790 by default
+```
+
+Listening defaults to loopback. Non-loopback binds require `VOICEBOX_API_KEY` unless
+you explicitly set `VOICEBOX_ALLOW_INSECURE_BIND=true`.
 
 ## Use it with your apps
 
@@ -176,7 +198,8 @@ Everything is set with environment variables (see `.env.example`):
 | `VOICEBOX_DEVICE` | `cpu` | `cpu` or `cuda` (CUDA needs the optional GPU image; see below) |
 | `VOICEBOX_CPU_THREADS` | `4` | CTranslate2 CPU threads for STT. Match physical cores / `VOICEBOX_CPUS`. Compose also sets `OMP_NUM_THREADS` and `MKL_NUM_THREADS` from this value to avoid OpenMP oversubscription (more threads than CPUs often hurts latency). Bare-metal runs should export the same OpenMP/MKL vars before starting the process. |
 | `VOICEBOX_API_KEY` | empty | Optional bearer token protecting audio endpoints |
-| `VOICEBOX_BIND_ADDRESS` | `127.0.0.1` | Host interface published by Docker Compose |
+| `VOICEBOX_BIND_ADDRESS` | `127.0.0.1` | Listen address for bare metal; Compose host publish address (container always listens on `0.0.0.0`) |
+| `VOICEBOX_ALLOW_INSECURE_BIND` | `false` | Allow non-loopback listen without an API key (Compose/image default `true`) |
 | `VOICEBOX_PORT` | `8790` | Listen port |
 | `VOICEBOX_MAX_AUDIO_SECONDS` | `120` | Reject longer STT input |
 | `VOICEBOX_MAX_UPLOAD_MB` | `25` | Reject larger uploads |
@@ -218,10 +241,11 @@ ctranslate2/cuDNN mismatches are a known risk until then.
 ## Development
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev]"   # requires Python 3.11
 pytest -m "not model and not latency"  # fast unit suite, including clients
 pytest                    # full local model + latency suite
 docker compose up -d --build && ./scripts/smoke.sh   # end-to-end
+# Published images are also smoked in CI after push (and weekly via image-smoke.yml)
 ```
 
 Under `src/voicebox/`: `stt.py` (faster-whisper), `tts.py` (Kokoro),

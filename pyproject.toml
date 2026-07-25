@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "voicebox"
 version = "0.2.9"
@@ -23,9 +27,12 @@ dev = ["pytest==9.1.1", "ruff==0.15.22"]
 [project.scripts]
 voicebox = "voicebox.__main__:main"
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.pytest.ini_options]
-pythonpath = ["src", "clients/voice-chat"]
-testpaths = ["tests", "clients/voice-chat"]
+pythonpath = ["src", "clients/voice-chat", "clients/claude-code"]
+testpaths = ["tests", "clients/voice-chat", "clients/claude-code"]
 markers = [
   "latency: host-sensitive latency benchmark",
   "model: requires local model weights and inference runtime",

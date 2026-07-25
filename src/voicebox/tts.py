@@ -38,7 +38,7 @@ class TtsEngine:
             ) from exc
 
     def list_voice_ids(self) -> list[str]:
-        return [self.default_voice]
+        return self.kokoro.get_voices()
 
     def sample_rate_for(self, voice: str | None = None) -> int:
         return self.sample_rate

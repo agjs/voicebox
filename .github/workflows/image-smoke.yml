@@ -1,0 +1,54 @@
+name: Image smoke
+
+# Pull a published CPU image and run scripts/smoke.sh. CUDA inference stays
+# manual (no GPU runners). Runs weekly against :main and on demand.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "GHCR image tag to smoke (e.g. main, 0.2.9)"
+        required: false
+        default: main
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull and smoke-test image
+        env:
+          TAG: ${{ github.event.inputs.tag || 'main' }}
+        run: |
+          set -euo pipefail
+          IMAGE="${REGISTRY}/${IMAGE_NAME}:${TAG}"
+          docker pull "$IMAGE"
+          cid=$(docker run -d --rm -p 127.0.0.1:8790:8790 \
+            -e VOICEBOX_BIND_ADDRESS=0.0.0.0 \
+            -e VOICEBOX_ALLOW_INSECURE_BIND=true \
+            "$IMAGE")
+          cleanup() { docker stop "$cid" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8790/health >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          ./scripts/smoke.sh http://127.0.0.1:8790

@@ -6,30 +6,26 @@ VOICEBOX_URL="${VOICEBOX_URL:-http://localhost:8790}"
 VOICEBOX_VOICE="${VOICEBOX_VOICE:-en_US-amy-medium}"
 VOICEBOX_SPEAK_MAX_CHARS="${VOICEBOX_SPEAK_MAX_CHARS:-600}"
 VOICEBOX_LOG="${VOICEBOX_LOG:-/dev/null}"
+HERE="$(cd "$(dirname "$0")" && pwd)"
 
 message=$(jq -r '.last_assistant_message // empty' 2>/dev/null || true)
 if [[ -z "$message" ]]; then
     exit 0
 fi
 
-# The sed expression is intentionally single-quoted; "$!" is a sed address.
-# shellcheck disable=SC2016
-cleaned=$(printf '%s\n' "$message" | \
-    sed -e ':a' -e '$!N;$!ba' -e 's/```[^`]*```//g' | \
-    sed \
-    -e 's#https\{0,1\}://[^ ]*##g' \
-    -e 's/`//g' \
-    -e 's/[*#]//g' \
-    -e 's/[[:space:]]\+/ /g' \
-    -e 's/^ *//;s/ *$//')
-
-if [[ -z "$cleaned" ]]; then
+cleaned_and_split=$(printf '%s\n' "$message" | python3 "$HERE/speak_text.py" --max-chars "$VOICEBOX_SPEAK_MAX_CHARS" --split-first)
+if [[ -z "$cleaned_and_split" ]]; then
     exit 0
 fi
 
-if (( ${#cleaned} > VOICEBOX_SPEAK_MAX_CHARS )); then
-    cleaned="${cleaned:0:VOICEBOX_SPEAK_MAX_CHARS}"
-    cleaned="${cleaned% *}"
+first="${cleaned_and_split%%$'\0'*}"
+remaining="${cleaned_and_split#*$'\0'}"
+if [[ "$remaining" == "$cleaned_and_split" ]]; then
+    remaining=""
+fi
+cleaned="$first"
+if [[ -n "$remaining" ]]; then
+    cleaned="$first $remaining"
 fi
 
 if [[ "$VOICEBOX_LOG" != "/dev/null" ]]; then
@@ -46,13 +42,6 @@ done
 if [[ -z "$player" ]]; then
     exit 0
 fi
-
-first=$(printf '%s\n' "$cleaned" | awk '
-    match($0, /[.!?]([[:space:]]|$)/) { print substr($0, 1, RSTART); next }
-    { print }
-')
-remaining="${cleaned:${#first}}"
-remaining=$(printf '%s' "$remaining" | sed -e 's/^ *//;s/ *$//')
 
 auth_args=()
 if [[ -n "${VOICEBOX_API_KEY:-}" ]]; then
