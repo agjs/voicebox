@@ -23,7 +23,7 @@
   <circle cx="100" cy="88" r="8" fill="#ff5f56"/>
   <circle cx="128" cy="88" r="8" fill="#ffbd2e"/>
   <circle cx="156" cy="88" r="8" fill="#27c93f"/>
-  <text x="640" y="94" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">voicebox 0.2.11 - localhost:8790</text>
+  <text x="640" y="94" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">voicebox 0.2.12 - localhost:8790</text>
 
   <text x="110" y="220" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="22">$</text>
   <text x="140" y="220" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="22">curl localhost:8790/v1/models</text>

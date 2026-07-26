@@ -12,7 +12,7 @@ voice with no glue code.
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT license"/></a>
   <a href="https://github.com/agjs/voicebox/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/agjs/voicebox/test.yml?style=flat-square&label=CI" alt="CI"/></a>
-  <img src="https://img.shields.io/badge/version-0.2.11-blue?style=flat-square" alt="version 0.2.11"/>
+  <img src="https://img.shields.io/badge/version-0.2.12-blue?style=flat-square" alt="version 0.2.12"/>
   <a href="https://github.com/agjs/voicebox/pkgs/container/voicebox"><img src="https://img.shields.io/badge/ghcr.io-agjs%2Fvoicebox-blue?style=flat-square" alt="GHCR"/></a>
   <img src="https://img.shields.io/badge/python-3.11-blue?style=flat-square" alt="Python 3.11"/>
 </p>
@@ -37,8 +37,8 @@ on another machine.
 
 ```bash
 # Fastest: pull a release (or :main) from GHCR
-docker pull ghcr.io/agjs/voicebox:0.2.11
-docker run --rm -p 127.0.0.1:8790:8790 ghcr.io/agjs/voicebox:0.2.11
+docker pull ghcr.io/agjs/voicebox:0.2.12
+docker run --rm -p 127.0.0.1:8790:8790 ghcr.io/agjs/voicebox:0.2.12
 
 # Or build locally (first build downloads models; a few minutes)
 git clone https://github.com/agjs/voicebox.git && cd voicebox
@@ -230,7 +230,7 @@ CPU), use the optional image:
 
 ```bash
 docker compose --profile cuda up -d --build   # needs NVIDIA Container Toolkit
-# or pull a release tag: ghcr.io/agjs/voicebox:0.2.11-cuda
+# or pull a release tag: ghcr.io/agjs/voicebox:0.2.12-cuda
 ```
 
 `-cuda` tags publish on version tags (`v*`) and manual `workflow_dispatch` only,
