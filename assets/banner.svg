@@ -24,7 +24,7 @@
   <circle cx="76" cy="56" r="6" fill="#ff5f56"/>
   <circle cx="98" cy="56" r="6" fill="#ffbd2e"/>
   <circle cx="120" cy="56" r="6" fill="#27c93f"/>
-  <text x="600" y="61" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="13">voicebox 0.2.13 - localhost:8790</text>
+  <text x="600" y="61" text-anchor="middle" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="13">voicebox 0.2.14 - localhost:8790</text>
 
   <!-- Prompt line -->
   <text x="80" y="120" fill="#3fb950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">$</text>
